@@ -88,6 +88,7 @@ export default function RelatorioScreen({ navigation }: Props) {
         "Produtos de Interesse",
         "Valor Total",
         "Estágio",
+        "Observações",
         "Vendedor",
         "Data de Cadastro",
       ];
@@ -103,6 +104,7 @@ export default function RelatorioScreen({ navigation }: Props) {
           .join("; "),
         formatarMoeda(valorTotalCliente(cliente.produtosInteresse)),
         labelEstagio(cliente.estagio ?? "contato"),
+        cliente.observacoes ?? "",
         nomeVendedor(cliente.vendedorId),
         new Date(cliente.criadoEm).toLocaleDateString("pt-BR"),
       ]);

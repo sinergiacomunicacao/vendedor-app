@@ -40,6 +40,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   const [estabelecimentoId, setEstabelecimentoId] = useState("");
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [quantidades, setQuantidades] = useState<Record<string, number>>({});
+  const [observacoes, setObservacoes] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -61,6 +62,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       setRazaoSocial(cliente.razaoSocial);
       setTelefone(cliente.telefone);
       setEmail(cliente.email);
+      setObservacoes(cliente.observacoes ?? "");
       setEstabelecimentoNomeOriginal(cliente.estabelecimento);
       setEstabelecimentoIdOriginal(cliente.estabelecimentoId || null);
       setProdutosOriginais(cliente.produtosInteresse.map(normalizarProdutoInteresse));
@@ -171,6 +173,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       estabelecimento: estabelecimento.nome,
       estabelecimentoId: estabelecimento.id,
       produtosSelecionados,
+      observacoes,
     };
 
     setSalvando(true);
@@ -332,6 +335,16 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
           </View>
         )}
 
+        <Text style={styles.label}>Observações</Text>
+        <TextInput
+          style={styles.inputObservacoes}
+          placeholder="Anotações sobre o cliente, histórico de contato, etc."
+          multiline
+          numberOfLines={4}
+          value={observacoes}
+          onChangeText={setObservacoes}
+        />
+
         {valorTotal > 0 && (
           <View style={styles.totalLinha}>
             <Text style={styles.totalLabel}>Total</Text>
@@ -386,6 +399,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Prompt_400Regular",
     color: colors.text,
+  },
+  inputObservacoes: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 15,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+    minHeight: 90,
+    textAlignVertical: "top",
   },
   opcoes: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   opcao: {

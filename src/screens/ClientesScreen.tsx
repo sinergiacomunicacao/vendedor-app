@@ -36,7 +36,14 @@ export default function ClientesScreen({ navigation }: Props) {
     const termo = busca.trim().toLowerCase();
     if (!termo) return clientes;
     return clientes.filter((cliente) =>
-      [cliente.razaoSocial, cliente.cnpj, cliente.telefone, cliente.email, cliente.estabelecimento]
+      [
+        cliente.razaoSocial,
+        cliente.cnpj,
+        cliente.telefone,
+        cliente.email,
+        cliente.estabelecimento,
+        cliente.observacoes ?? "",
+      ]
         .join(" ")
         .toLowerCase()
         .includes(termo)

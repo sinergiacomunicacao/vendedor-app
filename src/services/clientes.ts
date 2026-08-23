@@ -29,6 +29,7 @@ export type DadosCliente = {
   estabelecimento: string;
   estabelecimentoId: string;
   produtosSelecionados: ProdutoInteresse[];
+  observacoes?: string;
 };
 
 export async function criarCliente(dados: DadosCliente) {
@@ -62,6 +63,7 @@ export async function criarCliente(dados: DadosCliente) {
       estabelecimentoId: dados.estabelecimentoId,
       produtosInteresse: dados.produtosSelecionados,
       estagio: "contato",
+      observacoes: dados.observacoes?.trim() ?? "",
       criadoEm: Date.now(),
     });
   });
@@ -146,8 +148,13 @@ export async function atualizarCliente(
       estabelecimento: dados.estabelecimento,
       estabelecimentoId: dados.estabelecimentoId,
       produtosInteresse: dados.produtosSelecionados,
+      observacoes: dados.observacoes?.trim() ?? "",
     });
   });
+}
+
+export async function atualizarObservacoesCliente(id: string, observacoes: string) {
+  await updateDoc(doc(db, "clientes", id), { observacoes: observacoes.trim() });
 }
 
 export async function excluirCliente(cliente: Cliente) {

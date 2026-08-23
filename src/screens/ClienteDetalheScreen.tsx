@@ -1,10 +1,19 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { doc, onSnapshot } from "firebase/firestore";
 import { AppStackParamList } from "../navigation/types";
 import { db } from "../services/firebase";
-import { atualizarEstagioCliente, excluirCliente } from "../services/clientes";
+import { atualizarEstagioCliente, atualizarObservacoesCliente, excluirCliente } from "../services/clientes";
 import { colors } from "../theme/colors";
 import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse, valorTotalCliente } from "../types";
 import { formatarMoeda } from "../utils/format";
@@ -24,6 +33,8 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
   const [carregando, setCarregando] = useState(true);
   const [excluindo, setExcluindo] = useState(false);
   const [mudandoEstagio, setMudandoEstagio] = useState(false);
+  const [observacoes, setObservacoes] = useState("");
+  const [salvandoObservacoes, setSalvandoObservacoes] = useState(false);
 
   useEffect(() => {
     return onSnapshot(doc(db, "clientes", clienteId), (snapshot) => {
@@ -31,6 +42,22 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
       setCarregando(false);
     });
   }, [clienteId]);
+
+  useEffect(() => {
+    if (cliente) setObservacoes(cliente.observacoes ?? "");
+  }, [cliente?.id]);
+
+  async function handleSalvarObservacoes() {
+    if (!cliente) return;
+    setSalvandoObservacoes(true);
+    try {
+      await atualizarObservacoesCliente(cliente.id, observacoes);
+    } catch {
+      Alert.alert("Erro", "Não foi possível salvar as observações. Tente novamente.");
+    } finally {
+      setSalvandoObservacoes(false);
+    }
+  }
 
   async function handleMudarEstagio(estagio: Estagio) {
     if (!cliente || estagio === (cliente.estagio ?? "contato")) return;
@@ -158,6 +185,29 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
         </Text>
       </View>
 
+      <Text style={styles.rotulo}>Observações</Text>
+      <TextInput
+        style={styles.inputObservacoes}
+        placeholder="Anotações sobre o cliente, histórico de contato, etc."
+        multiline
+        numberOfLines={4}
+        value={observacoes}
+        onChangeText={setObservacoes}
+      />
+      {observacoes !== (cliente.observacoes ?? "") && (
+        <Pressable
+          style={styles.botaoSalvarObservacoes}
+          onPress={handleSalvarObservacoes}
+          disabled={salvandoObservacoes}
+        >
+          {salvandoObservacoes ? (
+            <ActivityIndicator color={colors.surface} />
+          ) : (
+            <Text style={styles.botaoSalvarObservacoesTexto}>Salvar observações</Text>
+          )}
+        </Pressable>
+      )}
+
       <Pressable
         style={styles.botaoEditar}
         onPress={() => navigation.navigate("NovoCliente", { clienteId })}
@@ -236,6 +286,25 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontFamily: "Prompt_600SemiBold", color: colors.textMuted, fontSize: 14 },
   totalValor: { fontFamily: "Prompt_700Bold", color: colors.primary, fontSize: 18 },
+  inputObservacoes: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 15,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+    minHeight: 90,
+    textAlignVertical: "top",
+  },
+  botaoSalvarObservacoes: {
+    backgroundColor: colors.accent,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  botaoSalvarObservacoesTexto: { color: colors.surface, fontSize: 14, fontFamily: "Prompt_600SemiBold" },
   botaoEditar: {
     backgroundColor: colors.primary,
     borderRadius: 8,
