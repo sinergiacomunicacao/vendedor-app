@@ -89,6 +89,8 @@ export default function RelatorioScreen({ navigation }: Props) {
         "Valor Total",
         "Estágio",
         "Observações",
+        "Cancelado",
+        "Motivo do Cancelamento",
         "Vendedor",
         "Data de Cadastro",
       ];
@@ -105,6 +107,8 @@ export default function RelatorioScreen({ navigation }: Props) {
         formatarMoeda(valorTotalCliente(cliente.produtosInteresse)),
         labelEstagio(cliente.estagio ?? "contato"),
         cliente.observacoes ?? "",
+        cliente.cancelado ? "Sim" : "Não",
+        cliente.motivoCancelamento ?? "",
         nomeVendedor(cliente.vendedorId),
         new Date(cliente.criadoEm).toLocaleDateString("pt-BR"),
       ]);
@@ -228,15 +232,24 @@ export default function RelatorioScreen({ navigation }: Props) {
               >
                 <View style={styles.cardTopo}>
                   <Text style={styles.razaoSocial}>{item.razaoSocial}</Text>
-                  <View style={[styles.tagEstagio, { backgroundColor: CORES_ESTAGIO[estagio] }]}>
-                    <Text style={styles.tagEstagioTexto}>{labelEstagio(estagio)}</Text>
-                  </View>
+                  {item.cancelado ? (
+                    <View style={[styles.tagEstagio, { backgroundColor: colors.danger }]}>
+                      <Text style={styles.tagEstagioTexto}>Cancelado</Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.tagEstagio, { backgroundColor: CORES_ESTAGIO[estagio] }]}>
+                      <Text style={styles.tagEstagioTexto}>{labelEstagio(estagio)}</Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={styles.detalhe}>Vendedor: {nomeVendedor(item.vendedorId)}</Text>
                 <Text style={styles.detalhe}>Estabelecimento: {item.estabelecimento}</Text>
                 <Text style={styles.detalhe}>
                   Cadastrado em: {new Date(item.criadoEm).toLocaleDateString("pt-BR")}
                 </Text>
+                {item.cancelado && item.motivoCancelamento ? (
+                  <Text style={styles.detalheMotivo}>Motivo: {item.motivoCancelamento}</Text>
+                ) : null}
                 <Text style={styles.detalheValor}>
                   {formatarMoeda(valorTotalCliente(item.produtosInteresse))}
                 </Text>
@@ -327,5 +340,12 @@ const styles = StyleSheet.create({
   tagEstagio: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   tagEstagioTexto: { color: colors.surface, fontSize: 11, fontFamily: "Prompt_600SemiBold" },
   detalhe: { fontSize: 14, fontFamily: "Prompt_400Regular", color: colors.text, marginBottom: 2 },
+  detalheMotivo: {
+    fontSize: 13,
+    fontFamily: "Prompt_400Regular",
+    color: colors.danger,
+    marginTop: 2,
+    marginBottom: 2,
+  },
   detalheValor: { fontSize: 14, fontFamily: "Prompt_600SemiBold", color: colors.primary, marginTop: 2 },
 });

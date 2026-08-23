@@ -28,6 +28,9 @@ export type Cliente = {
   estabelecimentoId: string;
   estagio?: Estagio;
   observacoes?: string;
+  cancelado?: boolean;
+  motivoCancelamento?: string;
+  canceladoEm?: number;
   criadoEm: number;
 };
 

@@ -2,6 +2,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,7 +13,7 @@ import {
 import { doc, onSnapshot } from "firebase/firestore";
 import { AppStackParamList } from "../navigation/types";
 import { db } from "../services/firebase";
-import { atualizarEstagioCliente, atualizarObservacoesCliente, excluirCliente } from "../services/clientes";
+import { atualizarEstagioCliente, atualizarObservacoesCliente, cancelarCliente } from "../services/clientes";
 import { colors } from "../theme/colors";
 import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse, valorTotalCliente } from "../types";
 import { showAlert } from "../utils/alert";
@@ -35,6 +36,8 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
   const [mudandoEstagio, setMudandoEstagio] = useState(false);
   const [observacoes, setObservacoes] = useState("");
   const [salvandoObservacoes, setSalvandoObservacoes] = useState(false);
+  const [modalCancelar, setModalCancelar] = useState(false);
+  const [motivoCancelamento, setMotivoCancelamento] = useState("");
 
   useEffect(() => {
     return onSnapshot(doc(db, "clientes", clienteId), (snapshot) => {
@@ -72,28 +75,21 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
   }
 
   function handleCancelar() {
-    showAlert(
-      "Cancelar cliente",
-      `Remover a ficha de "${cliente?.razaoSocial}"? Essa ação não pode ser desfeita.`,
-      [
-        { text: "Voltar", style: "cancel" },
-        {
-          text: "Cancelar cliente",
-          style: "destructive",
-          onPress: async () => {
-            if (!cliente) return;
-            setExcluindo(true);
-            try {
-              await excluirCliente(cliente);
-              navigation.goBack();
-            } catch {
-              setExcluindo(false);
-              showAlert("Erro", "Não foi possível cancelar o cliente. Tente novamente.");
-            }
-          },
-        },
-      ]
-    );
+    setMotivoCancelamento("");
+    setModalCancelar(true);
+  }
+
+  async function confirmarCancelamento() {
+    if (!cliente || !motivoCancelamento.trim()) return;
+    setExcluindo(true);
+    try {
+      await cancelarCliente(cliente, motivoCancelamento);
+      setModalCancelar(false);
+      navigation.goBack();
+    } catch {
+      setExcluindo(false);
+      showAlert("Erro", "Não foi possível cancelar o cliente. Tente novamente.");
+    }
   }
 
   if (carregando) {
@@ -117,6 +113,18 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
       <Text style={styles.razaoSocial}>{cliente.razaoSocial}</Text>
+
+      {cliente.cancelado && (
+        <View style={styles.avisoCancelado}>
+          <Text style={styles.avisoCanceladoTitulo}>
+            Cliente cancelado
+            {cliente.canceladoEm ? ` em ${new Date(cliente.canceladoEm).toLocaleDateString("pt-BR")}` : ""}
+          </Text>
+          {cliente.motivoCancelamento ? (
+            <Text style={styles.avisoCanceladoTexto}>Motivo: {cliente.motivoCancelamento}</Text>
+          ) : null}
+        </View>
+      )}
 
       <Text style={styles.rotulo}>Estágio</Text>
       <View style={styles.tagsLinha}>
@@ -208,20 +216,72 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
         </Pressable>
       )}
 
-      <Pressable
-        style={styles.botaoEditar}
-        onPress={() => navigation.navigate("NovoCliente", { clienteId })}
-      >
-        <Text style={styles.botaoEditarTexto}>Editar cliente</Text>
-      </Pressable>
+      {!cliente.cancelado && (
+        <>
+          <Pressable
+            style={styles.botaoEditar}
+            onPress={() => navigation.navigate("NovoCliente", { clienteId })}
+          >
+            <Text style={styles.botaoEditarTexto}>Editar cliente</Text>
+          </Pressable>
 
-      <Pressable style={styles.botaoCancelar} onPress={handleCancelar} disabled={excluindo}>
-        {excluindo ? (
-          <ActivityIndicator color={colors.danger} />
-        ) : (
-          <Text style={styles.botaoCancelarTexto}>Cancelar cliente</Text>
-        )}
-      </Pressable>
+          <Pressable style={styles.botaoCancelar} onPress={handleCancelar} disabled={excluindo}>
+            {excluindo ? (
+              <ActivityIndicator color={colors.danger} />
+            ) : (
+              <Text style={styles.botaoCancelarTexto}>Cancelar cliente</Text>
+            )}
+          </Pressable>
+        </>
+      )}
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={modalCancelar}
+        onRequestClose={() => setModalCancelar(false)}
+      >
+        <View style={styles.modalFundo}>
+          <View style={styles.modalCaixa}>
+            <Text style={styles.modalTitulo}>Cancelar cliente</Text>
+            <Text style={styles.modalMensagem}>
+              Remover a ficha de "{cliente.razaoSocial}"? Essa ação não pode ser desfeita. Informe o
+              motivo do cancelamento:
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Motivo do cancelamento"
+              multiline
+              numberOfLines={3}
+              value={motivoCancelamento}
+              onChangeText={setMotivoCancelamento}
+              autoFocus
+            />
+            <View style={styles.modalBotoes}>
+              <Pressable onPress={() => setModalCancelar(false)} disabled={excluindo}>
+                <Text style={styles.modalBotaoVoltarTexto}>Voltar</Text>
+              </Pressable>
+              <Pressable
+                onPress={confirmarCancelamento}
+                disabled={excluindo || !motivoCancelamento.trim()}
+              >
+                {excluindo ? (
+                  <ActivityIndicator color={colors.danger} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.modalBotaoConfirmarTexto,
+                      !motivoCancelamento.trim() && styles.modalBotaoDesabilitado,
+                    ]}
+                  >
+                    Cancelar cliente
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -322,4 +382,61 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   botaoCancelarTexto: { color: colors.danger, fontSize: 16, fontFamily: "Prompt_600SemiBold" },
+  avisoCancelado: {
+    backgroundColor: colors.danger + "15",
+    borderWidth: 1,
+    borderColor: colors.danger,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  avisoCanceladoTitulo: { color: colors.danger, fontFamily: "Prompt_600SemiBold", fontSize: 14 },
+  avisoCanceladoTexto: {
+    color: colors.danger,
+    fontFamily: "Prompt_400Regular",
+    fontSize: 13,
+    marginTop: 4,
+  },
+  modalFundo: {
+    flex: 1,
+    backgroundColor: "#00000066",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalCaixa: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 20,
+    width: "100%",
+    maxWidth: 360,
+  },
+  modalTitulo: { fontSize: 17, fontFamily: "Prompt_600SemiBold", color: colors.text, marginBottom: 8 },
+  modalMensagem: {
+    fontSize: 14,
+    fontFamily: "Prompt_400Regular",
+    color: colors.textMuted,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+    minHeight: 70,
+    textAlignVertical: "top",
+  },
+  modalBotoes: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 20,
+    marginTop: 16,
+  },
+  modalBotaoVoltarTexto: { fontSize: 15, fontFamily: "Prompt_400Regular", color: colors.textMuted },
+  modalBotaoConfirmarTexto: { fontSize: 15, fontFamily: "Prompt_600SemiBold", color: colors.danger },
+  modalBotaoDesabilitado: { color: colors.border },
 });

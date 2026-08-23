@@ -157,7 +157,7 @@ export async function atualizarObservacoesCliente(id: string, observacoes: strin
   await updateDoc(doc(db, "clientes", id), { observacoes: observacoes.trim() });
 }
 
-export async function excluirCliente(cliente: Cliente) {
+export async function cancelarCliente(cliente: Cliente, motivo: string) {
   await runTransaction(db, async (tx) => {
     const produtos = cliente.estabelecimentoId
       ? cliente.produtosInteresse.map(normalizarProdutoInteresse).filter((p) => p.quantidade > 0)
@@ -173,7 +173,11 @@ export async function excluirCliente(cliente: Cliente) {
       tx.update(refs[i], { estoque: estoque + produtos[i].quantidade });
     });
 
-    tx.delete(doc(db, "clientes", cliente.id));
+    tx.update(doc(db, "clientes", cliente.id), {
+      cancelado: true,
+      motivoCancelamento: motivo.trim(),
+      canceladoEm: Date.now(),
+    });
   });
 }
 
@@ -192,10 +196,9 @@ export function ouvirClientesDoVendedor(
     limit(LIMITE_CLIENTES)
   );
   return onSnapshot(q, (snapshot) => {
-    const clientes = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as Omit<Cliente, "id">),
-    }));
+    const clientes = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...(doc.data() as Omit<Cliente, "id">) }))
+      .filter((cliente) => !cliente.cancelado);
     callback(clientes);
   });
 }
