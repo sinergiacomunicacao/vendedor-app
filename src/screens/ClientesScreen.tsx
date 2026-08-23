@@ -5,7 +5,18 @@ import { useAuth } from "../contexts/AuthContext";
 import { AppStackParamList } from "../navigation/types";
 import { ouvirClientesDoVendedor } from "../services/clientes";
 import { colors } from "../theme/colors";
-import { Cliente } from "../types";
+import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse } from "../types";
+
+const CORES_ESTAGIO: Record<Estagio, string> = {
+  contato: colors.accent,
+  reuniao: colors.warning,
+  fechado: colors.success,
+  perdido: colors.danger,
+};
+
+function labelEstagio(estagio: Estagio) {
+  return ESTAGIOS.find((e) => e.id === estagio)?.label ?? estagio;
+}
 
 type Props = NativeStackScreenProps<AppStackParamList, "Clientes">;
 
@@ -20,29 +31,37 @@ export default function ClientesScreen({ navigation }: Props) {
   }, [user]);
 
   const renderItem = useCallback(
-    ({ item }: { item: Cliente }) => (
-      <Pressable
-        style={styles.card}
-        onPress={() => navigation.navigate("ClienteDetalhe", { clienteId: item.id })}
-      >
-        <Text style={styles.razaoSocial}>{item.razaoSocial}</Text>
-        <Text style={styles.detalhe}>CNPJ: {item.cnpj}</Text>
-        <Text style={styles.detalhe}>Telefone: {item.telefone}</Text>
-        <Text style={styles.detalhe}>Email: {item.email}</Text>
-        <View style={styles.tagsLinha}>
-          <View style={[styles.tag, styles.tagEstabelecimento]}>
-            <Text style={[styles.tagTexto, styles.tagTextoEstabelecimento]}>
-              {item.estabelecimento}
-            </Text>
-          </View>
-          {item.produtosInteresse.map((produto) => (
-            <View key={produto} style={styles.tag}>
-              <Text style={styles.tagTexto}>{produto}</Text>
+    ({ item }: { item: Cliente }) => {
+      const estagio = item.estagio ?? "contato";
+      return (
+        <Pressable
+          style={styles.card}
+          onPress={() => navigation.navigate("ClienteDetalhe", { clienteId: item.id })}
+        >
+          <View style={styles.cardTopo}>
+            <Text style={styles.razaoSocial}>{item.razaoSocial}</Text>
+            <View style={[styles.tagEstagio, { backgroundColor: CORES_ESTAGIO[estagio] }]}>
+              <Text style={styles.tagEstagioTexto}>{labelEstagio(estagio)}</Text>
             </View>
-          ))}
-        </View>
-      </Pressable>
-    ),
+          </View>
+          <Text style={styles.detalhe}>CNPJ: {item.cnpj}</Text>
+          <Text style={styles.detalhe}>Telefone: {item.telefone}</Text>
+          <Text style={styles.detalhe}>Email: {item.email}</Text>
+          <View style={styles.tagsLinha}>
+            <View style={[styles.tag, styles.tagEstabelecimento]}>
+              <Text style={[styles.tagTexto, styles.tagTextoEstabelecimento]}>
+                {item.estabelecimento}
+              </Text>
+            </View>
+            {item.produtosInteresse.map(normalizarProdutoInteresse).map((produto) => (
+              <View key={produto.id} style={styles.tag}>
+                <Text style={styles.tagTexto}>{produto.nome}</Text>
+              </View>
+            ))}
+          </View>
+        </Pressable>
+      );
+    },
     [navigation]
   );
 
@@ -57,6 +76,11 @@ export default function ClientesScreen({ navigation }: Props) {
           </Text>
         </View>
         <View style={styles.headerAcoes}>
+          {gestor && (
+            <Pressable onPress={() => navigation.navigate("Relatorio")}>
+              <Text style={styles.link}>Relatório</Text>
+            </Pressable>
+          )}
           {gestor && (
             <Pressable onPress={() => navigation.navigate("Estabelecimentos")}>
               <Text style={styles.link}>Estabelecimentos</Text>
@@ -112,12 +136,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  cardTopo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 6,
+    gap: 8,
+  },
   razaoSocial: {
+    flex: 1,
     fontSize: 16,
     fontFamily: "Prompt_600SemiBold",
     color: colors.primary,
-    marginBottom: 6,
   },
+  tagEstagio: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  tagEstagioTexto: { color: colors.surface, fontSize: 11, fontFamily: "Prompt_600SemiBold" },
   detalhe: { fontSize: 14, fontFamily: "Prompt_400Regular", color: colors.text, marginBottom: 2 },
   tagsLinha: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   tag: {

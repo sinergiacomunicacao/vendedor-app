@@ -9,4 +9,5 @@ export type AppStackParamList = {
   ClienteDetalhe: { clienteId: string };
   Estabelecimentos: undefined;
   Produtos: { estabelecimentoId: string; estabelecimentoNome: string };
+  Relatorio: undefined;
 };

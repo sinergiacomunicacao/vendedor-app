@@ -4,9 +4,16 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { doc, onSnapshot } from "firebase/firestore";
 import { AppStackParamList } from "../navigation/types";
 import { db } from "../services/firebase";
-import { excluirCliente } from "../services/clientes";
+import { atualizarEstagioCliente, excluirCliente } from "../services/clientes";
 import { colors } from "../theme/colors";
-import { Cliente } from "../types";
+import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse } from "../types";
+
+const CORES_ESTAGIO: Record<Estagio, string> = {
+  contato: colors.accent,
+  reuniao: colors.warning,
+  fechado: colors.success,
+  perdido: colors.danger,
+};
 
 type Props = NativeStackScreenProps<AppStackParamList, "ClienteDetalhe">;
 
@@ -15,6 +22,7 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [excluindo, setExcluindo] = useState(false);
+  const [mudandoEstagio, setMudandoEstagio] = useState(false);
 
   useEffect(() => {
     return onSnapshot(doc(db, "clientes", clienteId), (snapshot) => {
@@ -22,6 +30,18 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
       setCarregando(false);
     });
   }, [clienteId]);
+
+  async function handleMudarEstagio(estagio: Estagio) {
+    if (!cliente || estagio === (cliente.estagio ?? "contato")) return;
+    setMudandoEstagio(true);
+    try {
+      await atualizarEstagioCliente(cliente.id, estagio);
+    } catch {
+      Alert.alert("Erro", "Não foi possível atualizar o estágio. Tente novamente.");
+    } finally {
+      setMudandoEstagio(false);
+    }
+  }
 
   function handleCancelar() {
     Alert.alert(
@@ -33,9 +53,10 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
           text: "Cancelar cliente",
           style: "destructive",
           onPress: async () => {
+            if (!cliente) return;
             setExcluindo(true);
             try {
-              await excluirCliente(clienteId);
+              await excluirCliente(cliente);
               navigation.goBack();
             } catch {
               setExcluindo(false);
@@ -63,9 +84,35 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
     );
   }
 
+  const estagioAtual = cliente.estagio ?? "contato";
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
       <Text style={styles.razaoSocial}>{cliente.razaoSocial}</Text>
+
+      <Text style={styles.rotulo}>Estágio</Text>
+      <View style={styles.tagsLinha}>
+        {ESTAGIOS.map((estagio) => {
+          const ativo = estagio.id === estagioAtual;
+          const cor = CORES_ESTAGIO[estagio.id];
+          return (
+            <Pressable
+              key={estagio.id}
+              style={[
+                styles.pillEstagio,
+                { borderColor: cor },
+                ativo && { backgroundColor: cor },
+              ]}
+              onPress={() => handleMudarEstagio(estagio.id)}
+              disabled={mudandoEstagio}
+            >
+              <Text style={[styles.pillEstagioTexto, { color: ativo ? colors.surface : cor }]}>
+                {estagio.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
       <View style={styles.campo}>
         <Text style={styles.rotulo}>CNPJ</Text>
@@ -91,9 +138,9 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
 
       <Text style={styles.rotulo}>Produtos de interesse</Text>
       <View style={styles.tagsLinha}>
-        {cliente.produtosInteresse.map((produto) => (
-          <View key={produto} style={styles.tag}>
-            <Text style={styles.tagTexto}>{produto}</Text>
+        {cliente.produtosInteresse.map(normalizarProdutoInteresse).map((produto) => (
+          <View key={produto.id} style={styles.tag}>
+            <Text style={styles.tagTexto}>{produto.nome}</Text>
           </View>
         ))}
       </View>
@@ -125,8 +172,15 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontFamily: "Prompt_700Bold",
     color: colors.primary,
-    marginBottom: 20,
+    marginBottom: 12,
   },
+  pillEstagio: {
+    borderWidth: 1.5,
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  pillEstagioTexto: { fontFamily: "Prompt_600SemiBold", fontSize: 13 },
   campo: { marginBottom: 14 },
   rotulo: {
     fontSize: 12,

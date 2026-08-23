@@ -1,53 +1,54 @@
-# Deploy do App Vendedor Externo — GitHub Pages
+# Deploy do Sinergia Comercial — GitHub Pages
 
-## 1. Exportar build web
-Rodar na raiz do projeto Expo:
-```bash
-npx expo export --platform web
-```
-Gera a pasta `dist/` com os arquivos estáticos (HTML/JS/CSS).
+Site publicado em: **https://sinergiacomunicacao.github.io/vendedor-app**
 
-## 2. Criar o repositório no GitHub
-- Nome sugerido: `vendedor-app`
-- Pode ser público (recomendado, já que não há dados sensíveis no código — só no Firebase)
+Repositório: `sinergiacomunicacao/vendedor-app` (organização do GitHub, não conta pessoal).
 
-## 3. Subir os arquivos
+## Como funciona
 
-### Opção A — Manual (mais simples)
-```bash
-git init
-git remote add origin https://github.com/SEU_USUARIO/vendedor-app.git
-git add dist -f
-git commit -m "deploy inicial"
-git subtree push --prefix dist origin gh-pages
-```
+O deploy é automático via GitHub Actions (`.github/workflows/deploy.yml`): todo `git push` na
+branch `main` builda o app web (`npx expo export --platform web`) e publica no GitHub Pages.
+Não é necessário rodar nada manualmente.
 
-Para atualizar depois de uma mudança:
-```bash
-npx expo export --platform web
-git add dist -f
-git commit -m "update"
-git subtree push --prefix dist origin gh-pages
-```
-
-### Opção B — Automática (GitHub Actions)
-Ver `.github/workflows/deploy.yml` neste pacote. Basta copiar essa pasta `.github` para a raiz do seu projeto e configurar:
 - Settings → Pages → Source: **GitHub Actions**
+- `app.json` tem `experiments.baseUrl: "/vendedor-app"` — necessário porque o site fica numa
+  subpasta (`sinergiacomunicacao.github.io/vendedor-app`), não na raiz do domínio. Se o nome do
+  repositório mudar, esse valor precisa mudar junto.
 
-A partir daí, todo `git push` na branch `main` builda e publica sozinho.
+## Secrets do GitHub Actions
 
-## 4. Ativar o GitHub Pages
-- Repositório → Settings → Pages
-- Se usar Opção A: Source = branch `gh-pages`, pasta `/ (root)`
-- Se usar Opção B: Source = GitHub Actions
-- O link fica: `https://SEU_USUARIO.github.io/vendedor-app`
+O build usa as variáveis públicas do Firebase (não são segredos sensíveis, mas ficam como
+Secrets por conveniência). Em Settings → Secrets and variables → Actions:
 
-## 5. Ajustar o Firebase
-- Console Firebase → Authentication → Settings → Authorized domains
-- Adicionar: `SEU_USUARIO.github.io`
-(sem isso, o login por e-mail/senha pode ser bloqueado)
+```
+EXPO_PUBLIC_FIREBASE_API_KEY
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN
+EXPO_PUBLIC_FIREBASE_PROJECT_ID
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+EXPO_PUBLIC_FIREBASE_APP_ID
+```
 
-## 6. Testar
+Os valores são os mesmos do `.env` local do projeto.
+
+## Firebase — domínio autorizado
+
+Console Firebase → Authentication → Settings → Authorized domains já tem
+`sinergiacomunicacao.github.io` cadastrado. Se o site for movido para outro domínio/subdomínio,
+adicionar o novo domínio ali (sem isso o login por e-mail/senha pode ser bloqueado).
+
+## Testar
+
 - Acessar o link pelo celular do vendedor
 - Fazer login
 - No navegador, usar "Adicionar à tela inicial" para ganhar ícone e abertura em tela cheia
+
+## Rodar o export manualmente (debug local)
+
+Só necessário para depurar problemas de build sem esperar o Actions rodar:
+
+```bash
+npx expo export --platform web
+```
+
+Gera a pasta `dist/` (ignorada pelo git) com os arquivos estáticos.

@@ -28,8 +28,10 @@ export default function ProdutosScreen({ route }: Props) {
   const { estabelecimentoId } = route.params;
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [nome, setNome] = useState("");
+  const [estoque, setEstoque] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nomeEdicao, setNomeEdicao] = useState("");
+  const [estoqueEdicao, setEstoqueEdicao] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -46,10 +48,16 @@ export default function ProdutosScreen({ route }: Props) {
       setErro("Esse produto já existe nesse estabelecimento.");
       return;
     }
+    const estoqueNumero = Number(estoque);
+    if (!estoque.trim() || Number.isNaN(estoqueNumero) || estoqueNumero < 0) {
+      setErro("Informe uma quantidade em estoque válida.");
+      return;
+    }
     setSalvando(true);
     try {
-      await criarProduto(estabelecimentoId, nomeLimpo);
+      await criarProduto(estabelecimentoId, nomeLimpo, Math.floor(estoqueNumero));
       setNome("");
+      setEstoque("");
     } catch {
       setErro("Não foi possível salvar. Tente novamente.");
     } finally {
@@ -60,13 +68,18 @@ export default function ProdutosScreen({ route }: Props) {
   function iniciarEdicao(produto: Produto) {
     setEditandoId(produto.id);
     setNomeEdicao(produto.nome);
+    setEstoqueEdicao(String(produto.estoque));
   }
 
   async function salvarEdicao(produtoId: string) {
     const nomeLimpo = nomeEdicao.trim();
-    if (!nomeLimpo) return;
+    const estoqueNumero = Number(estoqueEdicao);
+    if (!nomeLimpo || Number.isNaN(estoqueNumero) || estoqueNumero < 0) return;
     try {
-      await atualizarProduto(estabelecimentoId, produtoId, nomeLimpo);
+      await atualizarProduto(estabelecimentoId, produtoId, {
+        nome: nomeLimpo,
+        estoque: Math.floor(estoqueNumero),
+      });
       setEditandoId(null);
     } catch {
       Alert.alert("Erro", "Não foi possível salvar a alteração. Tente novamente.");
@@ -102,6 +115,13 @@ export default function ProdutosScreen({ route }: Props) {
           value={nome}
           onChangeText={setNome}
         />
+        <TextInput
+          style={styles.inputEstoque}
+          placeholder="Estoque"
+          keyboardType="number-pad"
+          value={estoque}
+          onChangeText={setEstoque}
+        />
         <Pressable style={styles.botao} onPress={handleAdicionar} disabled={salvando}>
           {salvando ? (
             <ActivityIndicator color={colors.surface} />
@@ -128,6 +148,12 @@ export default function ProdutosScreen({ route }: Props) {
                 onChangeText={setNomeEdicao}
                 autoFocus
               />
+              <TextInput
+                style={styles.inputEdicaoEstoque}
+                value={estoqueEdicao}
+                onChangeText={setEstoqueEdicao}
+                keyboardType="number-pad"
+              />
               <Pressable onPress={() => salvarEdicao(item.id)}>
                 <Text style={styles.acaoSalvar}>Salvar</Text>
               </Pressable>
@@ -137,7 +163,12 @@ export default function ProdutosScreen({ route }: Props) {
             </View>
           ) : (
             <View style={styles.item}>
-              <Text style={styles.itemTexto}>{item.nome}</Text>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemTexto}>{item.nome}</Text>
+                <Text style={item.estoque > 0 ? styles.itemEstoque : styles.itemEsgotado}>
+                  {item.estoque > 0 ? `Estoque: ${item.estoque}` : "Esgotado"}
+                </Text>
+              </View>
               <View style={styles.acoes}>
                 <Pressable onPress={() => iniciarEdicao(item)}>
                   <Text style={styles.acaoEditar}>Editar</Text>
@@ -167,8 +198,28 @@ const styles = StyleSheet.create({
     fontFamily: "Prompt_400Regular",
     color: colors.text,
   },
+  inputEstoque: {
+    width: 80,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 15,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+  },
   inputEdicao: {
     flex: 1,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 15,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+  },
+  inputEdicaoEstoque: {
+    width: 60,
     borderWidth: 1,
     borderColor: colors.accent,
     borderRadius: 8,
@@ -198,7 +249,10 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: 10,
   },
+  itemInfo: { flex: 1 },
   itemTexto: { fontFamily: "Prompt_500Medium", color: colors.text, fontSize: 15 },
+  itemEstoque: { fontFamily: "Prompt_400Regular", color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  itemEsgotado: { fontFamily: "Prompt_600SemiBold", color: colors.danger, fontSize: 12, marginTop: 2 },
   acoes: { flexDirection: "row", gap: 16 },
   acaoEditar: { color: colors.accent, fontFamily: "Prompt_600SemiBold", fontSize: 13 },
   acaoExcluir: { color: colors.danger, fontFamily: "Prompt_600SemiBold", fontSize: 13 },

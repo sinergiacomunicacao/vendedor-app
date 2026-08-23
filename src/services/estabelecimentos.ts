@@ -19,6 +19,7 @@ export type Estabelecimento = {
 export type Produto = {
   id: string;
   nome: string;
+  estoque: number;
 };
 
 function estabelecimentosRef() {
@@ -49,23 +50,25 @@ export function ouvirProdutos(
   const q = query(produtosRef(estabelecimentoId), orderBy("nome", "asc"));
   return onSnapshot(q, (snapshot) => {
     callback(
-      snapshot.docs.map((doc) => ({ id: doc.id, nome: doc.data().nome as string }))
+      snapshot.docs.map((doc) => ({
+        id: doc.id,
+        nome: doc.data().nome as string,
+        estoque: (doc.data().estoque as number) ?? 0,
+      }))
     );
   });
 }
 
-export async function criarProduto(estabelecimentoId: string, nome: string) {
-  await addDoc(produtosRef(estabelecimentoId), { nome, criadoEm: serverTimestamp() });
+export async function criarProduto(estabelecimentoId: string, nome: string, estoque: number) {
+  await addDoc(produtosRef(estabelecimentoId), { nome, estoque, criadoEm: serverTimestamp() });
 }
 
 export async function atualizarProduto(
   estabelecimentoId: string,
   produtoId: string,
-  nome: string
+  dados: { nome: string; estoque: number }
 ) {
-  await updateDoc(doc(db, "estabelecimentos", estabelecimentoId, "produtos", produtoId), {
-    nome,
-  });
+  await updateDoc(doc(db, "estabelecimentos", estabelecimentoId, "produtos", produtoId), dados);
 }
 
 export async function excluirProduto(estabelecimentoId: string, produtoId: string) {

@@ -20,6 +20,7 @@ import NovoClienteScreen from "./src/screens/NovoClienteScreen";
 import EstabelecimentosScreen from "./src/screens/EstabelecimentosScreen";
 import ProdutosScreen from "./src/screens/ProdutosScreen";
 import ClienteDetalheScreen from "./src/screens/ClienteDetalheScreen";
+import RelatorioScreen from "./src/screens/RelatorioScreen";
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const AppStack = createNativeStackNavigator<AppStackParamList>();
@@ -96,6 +97,17 @@ function Root() {
               headerTintColor: "#fff",
               headerTitleStyle: { fontFamily: "Prompt_600SemiBold" },
             })}
+          />
+          <AppStack.Screen
+            name="Relatorio"
+            component={RelatorioScreen}
+            options={{
+              headerShown: true,
+              title: "Relatório",
+              headerStyle: { backgroundColor: colors.primary },
+              headerTintColor: "#fff",
+              headerTitleStyle: { fontFamily: "Prompt_600SemiBold" },
+            }}
           />
         </AppStack.Navigator>
       ) : (

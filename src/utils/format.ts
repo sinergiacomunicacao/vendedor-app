@@ -45,3 +45,19 @@ export function isValidCnpj(value: string): boolean {
 export function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
+
+export function maskData(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  return digits
+    .replace(/^(\d{2})(\d)/, "$1/$2")
+    .replace(/^(\d{2})\/(\d{2})(\d)/, "$1/$2/$3");
+}
+
+export function parseData(value: string, fimDoDia = false): number | null {
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, dia, mes, ano] = match;
+  const data = new Date(Number(ano), Number(mes) - 1, Number(dia));
+  if (fimDoDia) data.setHours(23, 59, 59, 999);
+  return data.getTime();
+}

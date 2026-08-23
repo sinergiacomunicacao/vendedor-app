@@ -48,9 +48,15 @@ npx expo start
 - **Nova ficha de cliente** (`src/screens/NovoClienteScreen.tsx`): formulário com máscara e validação de CNPJ, telefone e email, e seleção do produto de interesse.
 - Cada cliente salvo no Firestore (`clientes`) é vinculado ao `vendedorId` (uid do Firebase Auth), então cada vendedor só vê a própria carteira.
 
-## 5. Publicar nas lojas (próximo passo)
+## 5. Versão web (já publicada)
 
-Quando o app estiver pronto para os vendedores usarem de verdade:
+O app também roda no navegador, publicado em **https://sinergiacomunicacao.github.io/vendedor-app**
+via GitHub Pages, com deploy automático a cada push na branch `main`. Detalhes de como esse
+deploy funciona (secrets, domínio autorizado no Firebase, etc.) estão em [`DEPLOY.md`](./DEPLOY.md).
+
+## 6. Publicar nas lojas (próximo passo)
+
+Quando o app estiver pronto para os vendedores usarem de verdade como app nativo:
 
 ```bash
 npx eas build --platform android
@@ -61,7 +67,5 @@ Isso requer uma conta gratuita na [Expo (EAS)](https://expo.dev/eas) — no caso
 
 ## Ideias para próximas versões
 
-- Lista de produtos vinda do Firestore (hoje é uma lista fixa em `NovoClienteScreen.tsx`) para o time comercial editar sem precisar mexer no código.
-- Edição e exclusão de fichas de cliente já cadastradas.
 - Campo de observações/status do lead (ex: contatado, em negociação, fechado).
 - Exportar relatório de clientes por vendedor.

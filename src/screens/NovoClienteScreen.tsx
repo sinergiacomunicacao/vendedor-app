@@ -21,6 +21,7 @@ import {
   ouvirProdutos,
 } from "../services/estabelecimentos";
 import { colors } from "../theme/colors";
+import { ProdutoInteresse, normalizarProdutoInteresse } from "../types";
 import { isValidCnpj, isValidEmail, maskCnpj, maskTelefone } from "../utils/format";
 
 type Props = NativeStackScreenProps<AppStackParamList, "NovoCliente">;
@@ -38,14 +39,15 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   const [estabelecimentos, setEstabelecimentos] = useState<Estabelecimento[]>([]);
   const [estabelecimentoId, setEstabelecimentoId] = useState("");
   const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [produtosSelecionados, setProdutosSelecionados] = useState<string[]>([]);
+  const [produtosSelecionadosIds, setProdutosSelecionadosIds] = useState<string[]>([]);
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   const [estabelecimentoNomeOriginal, setEstabelecimentoNomeOriginal] = useState<string | null>(
     null
   );
-  const [produtosOriginais, setProdutosOriginais] = useState<string[] | null>(null);
+  const [estabelecimentoIdOriginal, setEstabelecimentoIdOriginal] = useState<string | null>(null);
+  const [produtosOriginais, setProdutosOriginais] = useState<ProdutoInteresse[] | null>(null);
 
   useEffect(() => {
     if (!clienteId) return;
@@ -60,7 +62,8 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       setTelefone(cliente.telefone);
       setEmail(cliente.email);
       setEstabelecimentoNomeOriginal(cliente.estabelecimento);
-      setProdutosOriginais(cliente.produtosInteresse);
+      setEstabelecimentoIdOriginal(cliente.estabelecimentoId || null);
+      setProdutosOriginais(cliente.produtosInteresse.map(normalizarProdutoInteresse));
       setCarregandoCliente(false);
     });
   }, [clienteId]);
@@ -70,6 +73,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       setEstabelecimentos(lista);
       setEstabelecimentoId((atual) => {
         if (atual) return atual;
+        if (estabelecimentoIdOriginal) return estabelecimentoIdOriginal;
         if (estabelecimentoNomeOriginal) {
           const encontrado = lista.find((e) => e.nome === estabelecimentoNomeOriginal);
           if (encontrado) return encontrado.id;
@@ -77,11 +81,11 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
         return modoEdicao ? "" : lista[0]?.id || "";
       });
     });
-  }, [estabelecimentoNomeOriginal, modoEdicao]);
+  }, [estabelecimentoNomeOriginal, estabelecimentoIdOriginal, modoEdicao]);
 
   useEffect(() => {
     setProdutos([]);
-    setProdutosSelecionados([]);
+    setProdutosSelecionadosIds([]);
     if (!estabelecimentoId) return;
     return ouvirProdutos(estabelecimentoId, setProdutos);
   }, [estabelecimentoId]);
@@ -89,13 +93,19 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   const [prefilAplicado, setPrefilAplicado] = useState(false);
   useEffect(() => {
     if (prefilAplicado || !produtosOriginais || !estabelecimentoId) return;
-    setProdutosSelecionados(produtosOriginais);
+    if (estabelecimentoId === estabelecimentoIdOriginal) {
+      setProdutosSelecionadosIds(produtosOriginais.map((p) => p.id));
+    }
     setPrefilAplicado(true);
-  }, [estabelecimentoId, produtosOriginais, prefilAplicado]);
+  }, [estabelecimentoId, estabelecimentoIdOriginal, produtosOriginais, prefilAplicado]);
 
-  function alternarProduto(nome: string) {
-    setProdutosSelecionados((atual) =>
-      atual.includes(nome) ? atual.filter((p) => p !== nome) : [...atual, nome]
+  function alternarProduto(produto: Produto) {
+    const jaEraOriginal = produtosOriginais?.some((p) => p.id === produto.id) ?? false;
+    if (produto.estoque <= 0 && !jaEraOriginal && !produtosSelecionadosIds.includes(produto.id)) {
+      return;
+    }
+    setProdutosSelecionadosIds((atual) =>
+      atual.includes(produto.id) ? atual.filter((id) => id !== produto.id) : [...atual, produto.id]
     );
   }
 
@@ -122,11 +132,17 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       setErro("Selecione um estabelecimento.");
       return;
     }
-    if (produtosSelecionados.length === 0) {
+    if (produtosSelecionadosIds.length === 0) {
       setErro("Selecione ao menos um produto.");
       return;
     }
     if (!user) return;
+
+    const produtosSelecionados: ProdutoInteresse[] = produtosSelecionadosIds.map((id) => {
+      const produto = produtos.find((p) => p.id === id);
+      const original = produtosOriginais?.find((p) => p.id === id);
+      return { id, nome: produto?.nome ?? original?.nome ?? id };
+    });
 
     const dados = {
       vendedorId: user.uid,
@@ -135,19 +151,32 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       telefone,
       email: email.trim(),
       estabelecimento: estabelecimento.nome,
-      produtosInteresse: produtosSelecionados,
+      estabelecimentoId: estabelecimento.id,
+      produtosSelecionados,
     };
 
     setSalvando(true);
     try {
       if (clienteId) {
-        await atualizarCliente(clienteId, dados);
+        await atualizarCliente(
+          clienteId,
+          dados,
+          produtosOriginais && estabelecimentoIdOriginal === estabelecimentoId
+            ? produtosOriginais
+            : [],
+          estabelecimentoIdOriginal ?? estabelecimentoId
+        );
       } else {
         await criarCliente(dados);
       }
       navigation.goBack();
-    } catch {
-      setErro("Não foi possível salvar. Tente novamente.");
+    } catch (e: any) {
+      const mensagem = String(e?.message ?? "");
+      if (mensagem.startsWith("ESGOTADO:")) {
+        setErro(`O produto "${mensagem.slice(9)}" acabou de esgotar. Ajuste a seleção.`);
+      } else {
+        setErro("Não foi possível salvar. Tente novamente.");
+      }
     } finally {
       setSalvando(false);
     }
@@ -243,18 +272,32 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
         ) : (
           <View style={styles.opcoes}>
             {produtos.map((produto) => {
-              const selecionado = produtosSelecionados.includes(produto.nome);
+              const selecionado = produtosSelecionadosIds.includes(produto.id);
+              const jaEraOriginal = produtosOriginais?.some((p) => p.id === produto.id) ?? false;
+              const esgotado = produto.estoque <= 0 && !jaEraOriginal && !selecionado;
               return (
                 <Pressable
                   key={produto.id}
-                  style={[styles.opcao, selecionado && styles.opcaoSelecionada]}
-                  onPress={() => alternarProduto(produto.nome)}
+                  style={[
+                    styles.opcao,
+                    selecionado && styles.opcaoSelecionada,
+                    esgotado && styles.opcaoDesabilitada,
+                  ]}
+                  onPress={() => alternarProduto(produto)}
+                  disabled={esgotado}
                 >
                   <Text
-                    style={[styles.opcaoTexto, selecionado && styles.opcaoTextoSelecionado]}
+                    style={[
+                      styles.opcaoTexto,
+                      selecionado && styles.opcaoTextoSelecionado,
+                      esgotado && styles.opcaoTextoDesabilitado,
+                    ]}
                   >
                     {selecionado ? "✓ " : ""}
                     {produto.nome}
+                    {esgotado
+                      ? " (esgotado)"
+                      : ` · ${produto.estoque} ${produto.estoque === 1 ? "disponível" : "disponíveis"}`}
                   </Text>
                 </Pressable>
               );
@@ -319,8 +362,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   opcaoSelecionada: { backgroundColor: colors.primary, borderColor: colors.primary },
+  opcaoDesabilitada: { backgroundColor: colors.background, opacity: 0.6 },
   opcaoTexto: { color: colors.textMuted, fontFamily: "Prompt_400Regular" },
   opcaoTextoSelecionado: { color: colors.surface, fontFamily: "Prompt_600SemiBold" },
+  opcaoTextoDesabilitado: { color: colors.textMuted, fontFamily: "Prompt_400Regular" },
   vazio: { color: colors.textMuted, fontFamily: "Prompt_400Regular", fontSize: 13 },
   erro: { color: colors.danger, fontFamily: "Prompt_400Regular", marginTop: 16, textAlign: "center" },
   botao: {
