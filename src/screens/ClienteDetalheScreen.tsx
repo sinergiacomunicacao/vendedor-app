@@ -6,7 +6,8 @@ import { AppStackParamList } from "../navigation/types";
 import { db } from "../services/firebase";
 import { atualizarEstagioCliente, excluirCliente } from "../services/clientes";
 import { colors } from "../theme/colors";
-import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse } from "../types";
+import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse, valorTotalCliente } from "../types";
+import { formatarMoeda } from "../utils/format";
 
 const CORES_ESTAGIO: Record<Estagio, string> = {
   contato: colors.accent,
@@ -137,12 +138,24 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
       </View>
 
       <Text style={styles.rotulo}>Produtos de interesse</Text>
-      <View style={styles.tagsLinha}>
+      <View style={styles.listaProdutos}>
         {cliente.produtosInteresse.map(normalizarProdutoInteresse).map((produto) => (
-          <View key={produto.id} style={styles.tag}>
-            <Text style={styles.tagTexto}>{produto.nome}</Text>
+          <View key={produto.id} style={styles.produtoLinha}>
+            <Text style={styles.produtoNome}>
+              {produto.nome}
+              {produto.quantidade > 1 ? `  ×${produto.quantidade}` : ""}
+            </Text>
+            <Text style={styles.produtoValor}>
+              {formatarMoeda(produto.valorUnitario * produto.quantidade)}
+            </Text>
           </View>
         ))}
+      </View>
+      <View style={styles.totalLinha}>
+        <Text style={styles.totalLabel}>Total</Text>
+        <Text style={styles.totalValor}>
+          {formatarMoeda(valorTotalCliente(cliente.produtosInteresse))}
+        </Text>
       </View>
 
       <Pressable
@@ -200,6 +213,29 @@ const styles = StyleSheet.create({
   tagTexto: { color: colors.accent, fontSize: 13, fontFamily: "Prompt_600SemiBold" },
   tagEstabelecimento: { backgroundColor: colors.warning + "33" },
   tagTextoEstabelecimento: { color: colors.primary },
+  listaProdutos: { gap: 6, marginBottom: 8 },
+  produtoLinha: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: colors.accent + "11",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  produtoNome: { color: colors.text, fontSize: 14, fontFamily: "Prompt_500Medium" },
+  produtoValor: { color: colors.textMuted, fontSize: 13, fontFamily: "Prompt_400Regular" },
+  totalLinha: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  totalLabel: { fontFamily: "Prompt_600SemiBold", color: colors.textMuted, fontSize: 14 },
+  totalValor: { fontFamily: "Prompt_700Bold", color: colors.primary, fontSize: 18 },
   botaoEditar: {
     backgroundColor: colors.primary,
     borderRadius: 8,

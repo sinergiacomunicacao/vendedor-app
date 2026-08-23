@@ -20,6 +20,7 @@ export type Produto = {
   id: string;
   nome: string;
   estoque: number;
+  valorTabela: number;
 };
 
 function estabelecimentosRef() {
@@ -54,19 +55,23 @@ export function ouvirProdutos(
         id: doc.id,
         nome: doc.data().nome as string,
         estoque: (doc.data().estoque as number) ?? 0,
+        valorTabela: (doc.data().valorTabela as number) ?? 0,
       }))
     );
   });
 }
 
-export async function criarProduto(estabelecimentoId: string, nome: string, estoque: number) {
-  await addDoc(produtosRef(estabelecimentoId), { nome, estoque, criadoEm: serverTimestamp() });
+export async function criarProduto(
+  estabelecimentoId: string,
+  dados: { nome: string; estoque: number; valorTabela: number }
+) {
+  await addDoc(produtosRef(estabelecimentoId), { ...dados, criadoEm: serverTimestamp() });
 }
 
 export async function atualizarProduto(
   estabelecimentoId: string,
   produtoId: string,
-  dados: { nome: string; estoque: number }
+  dados: { nome: string; estoque: number; valorTabela: number }
 ) {
   await updateDoc(doc(db, "estabelecimentos", estabelecimentoId, "produtos", produtoId), dados);
 }

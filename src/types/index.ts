@@ -10,7 +10,11 @@ export const ESTAGIOS: { id: Estagio; label: string }[] = [
 export type ProdutoInteresse = {
   id: string;
   nome: string;
+  quantidade: number;
+  valorUnitario: number;
 };
+
+type ProdutoInteresseAntigo = { id: string; nome: string; quantidade?: number; valorUnitario?: number };
 
 export type Cliente = {
   id: string;
@@ -19,13 +23,27 @@ export type Cliente = {
   razaoSocial: string;
   telefone: string;
   email: string;
-  produtosInteresse: (ProdutoInteresse | string)[];
+  produtosInteresse: (ProdutoInteresseAntigo | string)[];
   estabelecimento: string;
   estabelecimentoId: string;
   estagio?: Estagio;
   criadoEm: number;
 };
 
-export function normalizarProdutoInteresse(item: ProdutoInteresse | string): ProdutoInteresse {
-  return typeof item === "string" ? { id: item, nome: item } : item;
+export function normalizarProdutoInteresse(item: ProdutoInteresseAntigo | string): ProdutoInteresse {
+  if (typeof item === "string") {
+    return { id: item, nome: item, quantidade: 1, valorUnitario: 0 };
+  }
+  return {
+    id: item.id,
+    nome: item.nome,
+    quantidade: item.quantidade ?? 1,
+    valorUnitario: item.valorUnitario ?? 0,
+  };
+}
+
+export function valorTotalCliente(produtosInteresse: (ProdutoInteresseAntigo | string)[]): number {
+  return produtosInteresse
+    .map(normalizarProdutoInteresse)
+    .reduce((total, p) => total + p.quantidade * p.valorUnitario, 0);
 }

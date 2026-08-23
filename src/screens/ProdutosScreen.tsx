@@ -21,6 +21,7 @@ import {
   Produto,
 } from "../services/estabelecimentos";
 import { colors } from "../theme/colors";
+import { formatarMoeda, maskMoeda, parseMoeda } from "../utils/format";
 
 type Props = NativeStackScreenProps<AppStackParamList, "Produtos">;
 
@@ -29,9 +30,11 @@ export default function ProdutosScreen({ route }: Props) {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [nome, setNome] = useState("");
   const [estoque, setEstoque] = useState("");
+  const [valorTabela, setValorTabela] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nomeEdicao, setNomeEdicao] = useState("");
   const [estoqueEdicao, setEstoqueEdicao] = useState("");
+  const [valorEdicao, setValorEdicao] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -55,9 +58,14 @@ export default function ProdutosScreen({ route }: Props) {
     }
     setSalvando(true);
     try {
-      await criarProduto(estabelecimentoId, nomeLimpo, Math.floor(estoqueNumero));
+      await criarProduto(estabelecimentoId, {
+        nome: nomeLimpo,
+        estoque: Math.floor(estoqueNumero),
+        valorTabela: parseMoeda(valorTabela),
+      });
       setNome("");
       setEstoque("");
+      setValorTabela("");
     } catch {
       setErro("Não foi possível salvar. Tente novamente.");
     } finally {
@@ -69,6 +77,7 @@ export default function ProdutosScreen({ route }: Props) {
     setEditandoId(produto.id);
     setNomeEdicao(produto.nome);
     setEstoqueEdicao(String(produto.estoque));
+    setValorEdicao(produto.valorTabela ? maskMoeda(String(Math.round(produto.valorTabela * 100))) : "");
   }
 
   async function salvarEdicao(produtoId: string) {
@@ -79,6 +88,7 @@ export default function ProdutosScreen({ route }: Props) {
       await atualizarProduto(estabelecimentoId, produtoId, {
         nome: nomeLimpo,
         estoque: Math.floor(estoqueNumero),
+        valorTabela: parseMoeda(valorEdicao),
       });
       setEditandoId(null);
     } catch {
@@ -115,20 +125,29 @@ export default function ProdutosScreen({ route }: Props) {
           value={nome}
           onChangeText={setNome}
         />
-        <TextInput
-          style={styles.inputEstoque}
-          placeholder="Estoque"
-          keyboardType="number-pad"
-          value={estoque}
-          onChangeText={setEstoque}
-        />
-        <Pressable style={styles.botao} onPress={handleAdicionar} disabled={salvando}>
-          {salvando ? (
-            <ActivityIndicator color={colors.surface} />
-          ) : (
-            <Text style={styles.botaoTexto}>Adicionar</Text>
-          )}
-        </Pressable>
+        <View style={styles.formLinha}>
+          <TextInput
+            style={styles.inputEstoque}
+            placeholder="Estoque"
+            keyboardType="number-pad"
+            value={estoque}
+            onChangeText={setEstoque}
+          />
+          <TextInput
+            style={styles.inputValor}
+            placeholder="Valor de tabela"
+            keyboardType="number-pad"
+            value={valorTabela}
+            onChangeText={(v) => setValorTabela(maskMoeda(v))}
+          />
+          <Pressable style={styles.botao} onPress={handleAdicionar} disabled={salvando}>
+            {salvando ? (
+              <ActivityIndicator color={colors.surface} />
+            ) : (
+              <Text style={styles.botaoTexto}>Adicionar</Text>
+            )}
+          </Pressable>
+        </View>
       </View>
       {erro ? <Text style={styles.erro}>{erro}</Text> : null}
 
@@ -154,6 +173,12 @@ export default function ProdutosScreen({ route }: Props) {
                 onChangeText={setEstoqueEdicao}
                 keyboardType="number-pad"
               />
+              <TextInput
+                style={styles.inputEdicaoValor}
+                value={valorEdicao}
+                onChangeText={(v) => setValorEdicao(maskMoeda(v))}
+                keyboardType="number-pad"
+              />
               <Pressable onPress={() => salvarEdicao(item.id)}>
                 <Text style={styles.acaoSalvar}>Salvar</Text>
               </Pressable>
@@ -167,6 +192,8 @@ export default function ProdutosScreen({ route }: Props) {
                 <Text style={styles.itemTexto}>{item.nome}</Text>
                 <Text style={item.estoque > 0 ? styles.itemEstoque : styles.itemEsgotado}>
                   {item.estoque > 0 ? `Estoque: ${item.estoque}` : "Esgotado"}
+                  {"  ·  "}
+                  {formatarMoeda(item.valorTabela)}
                 </Text>
               </View>
               <View style={styles.acoes}>
@@ -187,9 +214,9 @@ export default function ProdutosScreen({ route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface, padding: 20 },
-  form: { flexDirection: "row", gap: 8 },
+  form: { gap: 8 },
+  formLinha: { flexDirection: "row", gap: 8 },
   input: {
-    flex: 1,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
@@ -200,6 +227,16 @@ const styles = StyleSheet.create({
   },
   inputEstoque: {
     width: 80,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 15,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+  },
+  inputValor: {
+    flex: 1,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
@@ -220,6 +257,16 @@ const styles = StyleSheet.create({
   },
   inputEdicaoEstoque: {
     width: 60,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 15,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+  },
+  inputEdicaoValor: {
+    width: 100,
     borderWidth: 1,
     borderColor: colors.accent,
     borderRadius: 8,

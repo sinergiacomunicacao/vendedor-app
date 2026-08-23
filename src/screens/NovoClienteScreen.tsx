@@ -22,7 +22,7 @@ import {
 } from "../services/estabelecimentos";
 import { colors } from "../theme/colors";
 import { ProdutoInteresse, normalizarProdutoInteresse } from "../types";
-import { isValidCnpj, isValidEmail, maskCnpj, maskTelefone } from "../utils/format";
+import { formatarMoeda, isValidCnpj, isValidEmail, maskCnpj, maskTelefone } from "../utils/format";
 
 type Props = NativeStackScreenProps<AppStackParamList, "NovoCliente">;
 
@@ -39,7 +39,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   const [estabelecimentos, setEstabelecimentos] = useState<Estabelecimento[]>([]);
   const [estabelecimentoId, setEstabelecimentoId] = useState("");
   const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [produtosSelecionadosIds, setProdutosSelecionadosIds] = useState<string[]>([]);
+  const [quantidades, setQuantidades] = useState<Record<string, number>>({});
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -85,7 +85,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     setProdutos([]);
-    setProdutosSelecionadosIds([]);
+    setQuantidades({});
     if (!estabelecimentoId) return;
     return ouvirProdutos(estabelecimentoId, setProdutos);
   }, [estabelecimentoId]);
@@ -94,20 +94,36 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (prefilAplicado || !produtosOriginais || !estabelecimentoId) return;
     if (estabelecimentoId === estabelecimentoIdOriginal) {
-      setProdutosSelecionadosIds(produtosOriginais.map((p) => p.id));
+      const inicial: Record<string, number> = {};
+      produtosOriginais.forEach((p) => {
+        inicial[p.id] = p.quantidade;
+      });
+      setQuantidades(inicial);
     }
     setPrefilAplicado(true);
   }, [estabelecimentoId, estabelecimentoIdOriginal, produtosOriginais, prefilAplicado]);
 
-  function alternarProduto(produto: Produto) {
-    const jaEraOriginal = produtosOriginais?.some((p) => p.id === produto.id) ?? false;
-    if (produto.estoque <= 0 && !jaEraOriginal && !produtosSelecionadosIds.includes(produto.id)) {
-      return;
-    }
-    setProdutosSelecionadosIds((atual) =>
-      atual.includes(produto.id) ? atual.filter((id) => id !== produto.id) : [...atual, produto.id]
-    );
+  function disponivelParaEsteCliente(produto: Produto) {
+    const original =
+      estabelecimentoId === estabelecimentoIdOriginal
+        ? produtosOriginais?.find((p) => p.id === produto.id)?.quantidade ?? 0
+        : 0;
+    return produto.estoque + original;
   }
+
+  function alterarQuantidade(produto: Produto, delta: number) {
+    const disponivel = disponivelParaEsteCliente(produto);
+    setQuantidades((atual) => {
+      const atualQtd = atual[produto.id] ?? 0;
+      const novaQtd = Math.max(0, Math.min(disponivel, atualQtd + delta));
+      return { ...atual, [produto.id]: novaQtd };
+    });
+  }
+
+  const valorTotal = produtos.reduce(
+    (total, p) => total + (quantidades[p.id] ?? 0) * p.valorTabela,
+    0
+  );
 
   async function handleSalvar() {
     setErro("");
@@ -132,17 +148,19 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       setErro("Selecione um estabelecimento.");
       return;
     }
-    if (produtosSelecionadosIds.length === 0) {
+    const produtosSelecionados: ProdutoInteresse[] = produtos
+      .filter((p) => (quantidades[p.id] ?? 0) > 0)
+      .map((p) => ({
+        id: p.id,
+        nome: p.nome,
+        quantidade: quantidades[p.id],
+        valorUnitario: p.valorTabela,
+      }));
+    if (produtosSelecionados.length === 0) {
       setErro("Selecione ao menos um produto.");
       return;
     }
     if (!user) return;
-
-    const produtosSelecionados: ProdutoInteresse[] = produtosSelecionadosIds.map((id) => {
-      const produto = produtos.find((p) => p.id === id);
-      const original = produtosOriginais?.find((p) => p.id === id);
-      return { id, nome: produto?.nome ?? original?.nome ?? id };
-    });
 
     const dados = {
       vendedorId: user.uid,
@@ -173,7 +191,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
     } catch (e: any) {
       const mensagem = String(e?.message ?? "");
       if (mensagem.startsWith("ESGOTADO:")) {
-        setErro(`O produto "${mensagem.slice(9)}" acabou de esgotar. Ajuste a seleção.`);
+        setErro(`O produto "${mensagem.slice(9)}" não tem mais estoque suficiente. Ajuste a quantidade.`);
       } else {
         setErro("Não foi possível salvar. Tente novamente.");
       }
@@ -264,44 +282,60 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
         )}
 
         <Text style={styles.label}>Produtos de interesse</Text>
-        <Text style={styles.ajuda}>Pode marcar mais de um.</Text>
+        <Text style={styles.ajuda}>Use os botões para escolher a quantidade de cada produto.</Text>
         {estabelecimentoId && produtos.length === 0 ? (
           <Text style={styles.vazio}>
             Nenhum produto cadastrado para esse estabelecimento ainda.
           </Text>
         ) : (
-          <View style={styles.opcoes}>
+          <View style={styles.listaProdutos}>
             {produtos.map((produto) => {
-              const selecionado = produtosSelecionadosIds.includes(produto.id);
-              const jaEraOriginal = produtosOriginais?.some((p) => p.id === produto.id) ?? false;
-              const esgotado = produto.estoque <= 0 && !jaEraOriginal && !selecionado;
+              const disponivel = disponivelParaEsteCliente(produto);
+              const quantidade = quantidades[produto.id] ?? 0;
+              const esgotado = disponivel <= 0;
               return (
-                <Pressable
+                <View
                   key={produto.id}
-                  style={[
-                    styles.opcao,
-                    selecionado && styles.opcaoSelecionada,
-                    esgotado && styles.opcaoDesabilitada,
-                  ]}
-                  onPress={() => alternarProduto(produto)}
-                  disabled={esgotado}
+                  style={[styles.produtoLinha, esgotado && styles.produtoLinhaDesabilitada]}
                 >
-                  <Text
-                    style={[
-                      styles.opcaoTexto,
-                      selecionado && styles.opcaoTextoSelecionado,
-                      esgotado && styles.opcaoTextoDesabilitado,
-                    ]}
-                  >
-                    {selecionado ? "✓ " : ""}
-                    {produto.nome}
-                    {esgotado
-                      ? " (esgotado)"
-                      : ` · ${produto.estoque} ${produto.estoque === 1 ? "disponível" : "disponíveis"}`}
-                  </Text>
-                </Pressable>
+                  <View style={styles.produtoInfo}>
+                    <Text style={styles.produtoNome}>{produto.nome}</Text>
+                    <Text style={styles.produtoDetalhe}>
+                      {formatarMoeda(produto.valorTabela)}
+                      {"  ·  "}
+                      {esgotado ? "Esgotado" : `${disponivel} disponíve${disponivel === 1 ? "l" : "is"}`}
+                    </Text>
+                  </View>
+                  <View style={styles.stepper}>
+                    <Pressable
+                      style={[styles.stepperBotao, quantidade <= 0 && styles.stepperBotaoDesabilitado]}
+                      onPress={() => alterarQuantidade(produto, -1)}
+                      disabled={quantidade <= 0}
+                    >
+                      <Text style={styles.stepperBotaoTexto}>−</Text>
+                    </Pressable>
+                    <Text style={styles.stepperValor}>{quantidade}</Text>
+                    <Pressable
+                      style={[
+                        styles.stepperBotao,
+                        quantidade >= disponivel && styles.stepperBotaoDesabilitado,
+                      ]}
+                      onPress={() => alterarQuantidade(produto, 1)}
+                      disabled={quantidade >= disponivel}
+                    >
+                      <Text style={styles.stepperBotaoTexto}>+</Text>
+                    </Pressable>
+                  </View>
+                </View>
               );
             })}
+          </View>
+        )}
+
+        {valorTotal > 0 && (
+          <View style={styles.totalLinha}>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalValor}>{formatarMoeda(valorTotal)}</Text>
           </View>
         )}
 
@@ -362,11 +396,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   opcaoSelecionada: { backgroundColor: colors.primary, borderColor: colors.primary },
-  opcaoDesabilitada: { backgroundColor: colors.background, opacity: 0.6 },
   opcaoTexto: { color: colors.textMuted, fontFamily: "Prompt_400Regular" },
   opcaoTextoSelecionado: { color: colors.surface, fontFamily: "Prompt_600SemiBold" },
-  opcaoTextoDesabilitado: { color: colors.textMuted, fontFamily: "Prompt_400Regular" },
   vazio: { color: colors.textMuted, fontFamily: "Prompt_400Regular", fontSize: 13 },
+  listaProdutos: { gap: 8 },
+  produtoLinha: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    padding: 12,
+    gap: 10,
+  },
+  produtoLinhaDesabilitada: { backgroundColor: colors.background, opacity: 0.6 },
+  produtoInfo: { flex: 1 },
+  produtoNome: { fontFamily: "Prompt_500Medium", color: colors.text, fontSize: 14 },
+  produtoDetalhe: { fontFamily: "Prompt_400Regular", color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  stepper: { flexDirection: "row", alignItems: "center", gap: 10 },
+  stepperBotao: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperBotaoDesabilitado: { backgroundColor: colors.border },
+  stepperBotaoTexto: { color: colors.surface, fontSize: 18, fontFamily: "Prompt_600SemiBold", lineHeight: 20 },
+  stepperValor: { fontFamily: "Prompt_600SemiBold", color: colors.text, fontSize: 15, minWidth: 20, textAlign: "center" },
+  totalLinha: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  totalLabel: { fontFamily: "Prompt_600SemiBold", color: colors.textMuted, fontSize: 14 },
+  totalValor: { fontFamily: "Prompt_700Bold", color: colors.primary, fontSize: 18 },
   erro: { color: colors.danger, fontFamily: "Prompt_400Regular", marginTop: 16, textAlign: "center" },
   botao: {
     backgroundColor: colors.primary,

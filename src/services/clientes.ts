@@ -40,14 +40,15 @@ export async function criarCliente(dados: DadosCliente) {
 
     snaps.forEach((snap, i) => {
       const estoque = (snap.data()?.estoque as number) ?? 0;
-      if (estoque <= 0) {
+      const quantidade = dados.produtosSelecionados[i].quantidade;
+      if (estoque < quantidade) {
         throw new Error(`ESGOTADO:${dados.produtosSelecionados[i].nome}`);
       }
     });
 
     snaps.forEach((snap, i) => {
       const estoque = (snap.data()?.estoque as number) ?? 0;
-      tx.update(refs[i], { estoque: estoque - 1 });
+      tx.update(refs[i], { estoque: estoque - dados.produtosSelecionados[i].quantidade });
     });
 
     const clienteRef = doc(clientesRef());
@@ -73,39 +74,69 @@ export async function atualizarCliente(
   estabelecimentoIdOriginal: string
 ) {
   await runTransaction(db, async (tx) => {
-    const removidos = produtosOriginais.filter(
-      (orig) => !dados.produtosSelecionados.some((p) => p.id === orig.id)
-    );
-    const adicionados = dados.produtosSelecionados.filter(
-      (p) => !produtosOriginais.some((orig) => orig.id === p.id)
-    );
+    const mesmoEstabelecimento = estabelecimentoIdOriginal === dados.estabelecimentoId;
 
-    const refsRemovidos = removidos.map((p) =>
-      doc(db, "estabelecimentos", estabelecimentoIdOriginal, "produtos", p.id)
-    );
-    const refsAdicionados = adicionados.map((p) =>
-      doc(db, "estabelecimentos", dados.estabelecimentoId, "produtos", p.id)
-    );
+    if (mesmoEstabelecimento) {
+      const qtdOriginal = new Map(produtosOriginais.map((p) => [p.id, p.quantidade]));
+      const qtdNova = new Map(dados.produtosSelecionados.map((p) => [p.id, p.quantidade]));
+      const nomes = new Map(dados.produtosSelecionados.map((p) => [p.id, p.nome]));
+      produtosOriginais.forEach((p) => nomes.set(p.id, nomes.get(p.id) ?? p.nome));
+      const idsEnvolvidos = new Set([...qtdOriginal.keys(), ...qtdNova.keys()]);
 
-    const snapsRemovidos = await Promise.all(refsRemovidos.map((ref) => tx.get(ref)));
-    const snapsAdicionados = await Promise.all(refsAdicionados.map((ref) => tx.get(ref)));
+      const ajustes = Array.from(idsEnvolvidos)
+        .map((id) => ({
+          id,
+          nome: nomes.get(id) ?? id,
+          delta: (qtdNova.get(id) ?? 0) - (qtdOriginal.get(id) ?? 0),
+        }))
+        .filter((a) => a.delta !== 0);
 
-    snapsAdicionados.forEach((snap, i) => {
-      const estoque = (snap.data()?.estoque as number) ?? 0;
-      if (estoque <= 0) {
-        throw new Error(`ESGOTADO:${adicionados[i].nome}`);
-      }
-    });
+      const refs = ajustes.map((a) =>
+        doc(db, "estabelecimentos", dados.estabelecimentoId, "produtos", a.id)
+      );
+      const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
 
-    snapsRemovidos.forEach((snap, i) => {
-      if (!snap.exists()) return;
-      const estoque = (snap.data()?.estoque as number) ?? 0;
-      tx.update(refsRemovidos[i], { estoque: estoque + 1 });
-    });
-    snapsAdicionados.forEach((snap, i) => {
-      const estoque = (snap.data()?.estoque as number) ?? 0;
-      tx.update(refsAdicionados[i], { estoque: estoque - 1 });
-    });
+      snaps.forEach((snap, i) => {
+        const estoque = (snap.data()?.estoque as number) ?? 0;
+        if (ajustes[i].delta > 0 && estoque < ajustes[i].delta) {
+          throw new Error(`ESGOTADO:${ajustes[i].nome}`);
+        }
+      });
+
+      snaps.forEach((snap, i) => {
+        const estoque = (snap.data()?.estoque as number) ?? 0;
+        tx.update(refs[i], { estoque: estoque - ajustes[i].delta });
+      });
+    } else {
+      const produtosParaRestaurar = produtosOriginais.filter((p) => p.quantidade > 0);
+      const refsRestaurar = produtosParaRestaurar.map((p) =>
+        doc(db, "estabelecimentos", estabelecimentoIdOriginal, "produtos", p.id)
+      );
+      const snapsRestaurar = await Promise.all(refsRestaurar.map((ref) => tx.get(ref)));
+
+      const produtosParaDebitar = dados.produtosSelecionados.filter((p) => p.quantidade > 0);
+      const refsDebitar = produtosParaDebitar.map((p) =>
+        doc(db, "estabelecimentos", dados.estabelecimentoId, "produtos", p.id)
+      );
+      const snapsDebitar = await Promise.all(refsDebitar.map((ref) => tx.get(ref)));
+
+      snapsDebitar.forEach((snap, i) => {
+        const estoque = (snap.data()?.estoque as number) ?? 0;
+        if (estoque < produtosParaDebitar[i].quantidade) {
+          throw new Error(`ESGOTADO:${produtosParaDebitar[i].nome}`);
+        }
+      });
+
+      snapsRestaurar.forEach((snap, i) => {
+        if (!snap.exists()) return;
+        const estoque = (snap.data()?.estoque as number) ?? 0;
+        tx.update(refsRestaurar[i], { estoque: estoque + produtosParaRestaurar[i].quantidade });
+      });
+      snapsDebitar.forEach((snap, i) => {
+        const estoque = (snap.data()?.estoque as number) ?? 0;
+        tx.update(refsDebitar[i], { estoque: estoque - produtosParaDebitar[i].quantidade });
+      });
+    }
 
     tx.update(doc(db, "clientes", clienteId), {
       cnpj: dados.cnpj,
@@ -121,17 +152,18 @@ export async function atualizarCliente(
 
 export async function excluirCliente(cliente: Cliente) {
   await runTransaction(db, async (tx) => {
-    const refs = cliente.estabelecimentoId
-      ? cliente.produtosInteresse
-          .map(normalizarProdutoInteresse)
-          .map((p) => doc(db, "estabelecimentos", cliente.estabelecimentoId, "produtos", p.id))
+    const produtos = cliente.estabelecimentoId
+      ? cliente.produtosInteresse.map(normalizarProdutoInteresse).filter((p) => p.quantidade > 0)
       : [];
+    const refs = produtos.map((p) =>
+      doc(db, "estabelecimentos", cliente.estabelecimentoId, "produtos", p.id)
+    );
     const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
 
     snaps.forEach((snap, i) => {
       if (!snap.exists()) return;
       const estoque = (snap.data()?.estoque as number) ?? 0;
-      tx.update(refs[i], { estoque: estoque + 1 });
+      tx.update(refs[i], { estoque: estoque + produtos[i].quantidade });
     });
 
     tx.delete(doc(db, "clientes", cliente.id));

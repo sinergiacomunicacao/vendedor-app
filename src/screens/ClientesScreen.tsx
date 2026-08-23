@@ -5,7 +5,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { AppStackParamList } from "../navigation/types";
 import { ouvirClientesDoVendedor } from "../services/clientes";
 import { colors } from "../theme/colors";
-import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse } from "../types";
+import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse, valorTotalCliente } from "../types";
+import { formatarMoeda } from "../utils/format";
 
 const CORES_ESTAGIO: Record<Estagio, string> = {
   contato: colors.accent,
@@ -47,6 +48,7 @@ export default function ClientesScreen({ navigation }: Props) {
           <Text style={styles.detalhe}>CNPJ: {item.cnpj}</Text>
           <Text style={styles.detalhe}>Telefone: {item.telefone}</Text>
           <Text style={styles.detalhe}>Email: {item.email}</Text>
+          <Text style={styles.detalheValor}>{formatarMoeda(valorTotalCliente(item.produtosInteresse))}</Text>
           <View style={styles.tagsLinha}>
             <View style={[styles.tag, styles.tagEstabelecimento]}>
               <Text style={[styles.tagTexto, styles.tagTextoEstabelecimento]}>
@@ -55,7 +57,10 @@ export default function ClientesScreen({ navigation }: Props) {
             </View>
             {item.produtosInteresse.map(normalizarProdutoInteresse).map((produto) => (
               <View key={produto.id} style={styles.tag}>
-                <Text style={styles.tagTexto}>{produto.nome}</Text>
+                <Text style={styles.tagTexto}>
+                  {produto.nome}
+                  {produto.quantidade > 1 ? ` ×${produto.quantidade}` : ""}
+                </Text>
               </View>
             ))}
           </View>
@@ -152,6 +157,7 @@ const styles = StyleSheet.create({
   tagEstagio: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   tagEstagioTexto: { color: colors.surface, fontSize: 11, fontFamily: "Prompt_600SemiBold" },
   detalhe: { fontSize: 14, fontFamily: "Prompt_400Regular", color: colors.text, marginBottom: 2 },
+  detalheValor: { fontSize: 14, fontFamily: "Prompt_600SemiBold", color: colors.primary, marginTop: 2 },
   tagsLinha: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   tag: {
     alignSelf: "flex-start",

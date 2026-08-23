@@ -61,3 +61,21 @@ export function parseData(value: string, fimDoDia = false): number | null {
   if (fimDoDia) data.setHours(23, 59, 59, 999);
   return data.getTime();
 }
+
+export function maskMoeda(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  const semZerosExtras = digits.replace(/^0+(?=\d)/, "");
+  const cents = semZerosExtras.padStart(3, "0");
+  const reais = cents.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const centavos = cents.slice(-2);
+  return `R$ ${reais},${centavos}`;
+}
+
+export function parseMoeda(value: string): number {
+  const digits = value.replace(/\D/g, "");
+  return Number(digits) / 100;
+}
+
+export function formatarMoeda(valor: number): string {
+  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}

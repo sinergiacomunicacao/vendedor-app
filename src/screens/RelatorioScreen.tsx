@@ -14,9 +14,9 @@ import { ouvirTodosClientes } from "../services/clientes";
 import { Estabelecimento, ouvirEstabelecimentos } from "../services/estabelecimentos";
 import { ouvirVendedores, Vendedor } from "../services/vendedores";
 import { colors } from "../theme/colors";
-import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse } from "../types";
+import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse, valorTotalCliente } from "../types";
 import { exportarCsv, paraCsv } from "../utils/csv";
-import { maskData, parseData } from "../utils/format";
+import { formatarMoeda, maskData, parseData } from "../utils/format";
 
 type Props = NativeStackScreenProps<AppStackParamList, "Relatorio">;
 
@@ -71,6 +71,11 @@ export default function RelatorioScreen({ navigation }: Props) {
     });
   }, [clientes, vendedorId, estabelecimentoNome, dataInicio, dataFim]);
 
+  const valorTotalFiltrado = useMemo(
+    () => clientesFiltrados.reduce((total, c) => total + valorTotalCliente(c.produtosInteresse), 0),
+    [clientesFiltrados]
+  );
+
   async function handleExportar() {
     setExportando(true);
     try {
@@ -81,6 +86,7 @@ export default function RelatorioScreen({ navigation }: Props) {
         "Email",
         "Estabelecimento",
         "Produtos de Interesse",
+        "Valor Total",
         "Estágio",
         "Vendedor",
         "Data de Cadastro",
@@ -93,8 +99,9 @@ export default function RelatorioScreen({ navigation }: Props) {
         cliente.estabelecimento,
         cliente.produtosInteresse
           .map(normalizarProdutoInteresse)
-          .map((p) => p.nome)
+          .map((p) => (p.quantidade > 1 ? `${p.nome} ×${p.quantidade}` : p.nome))
           .join("; "),
+        formatarMoeda(valorTotalCliente(cliente.produtosInteresse)),
         labelEstagio(cliente.estagio ?? "contato"),
         nomeVendedor(cliente.vendedorId),
         new Date(cliente.criadoEm).toLocaleDateString("pt-BR"),
@@ -180,6 +187,13 @@ export default function RelatorioScreen({ navigation }: Props) {
           ))}
         </View>
 
+        <View style={styles.totalFiltroLinha}>
+          <Text style={styles.totalFiltroLabel}>
+            {clientesFiltrados.length} cliente{clientesFiltrados.length === 1 ? "" : "s"}
+          </Text>
+          <Text style={styles.totalFiltroValor}>{formatarMoeda(valorTotalFiltrado)}</Text>
+        </View>
+
         <Pressable style={styles.botaoExportar} onPress={handleExportar} disabled={exportando}>
           {exportando ? (
             <ActivityIndicator color={colors.surface} />
@@ -220,6 +234,9 @@ export default function RelatorioScreen({ navigation }: Props) {
                 <Text style={styles.detalhe}>Estabelecimento: {item.estabelecimento}</Text>
                 <Text style={styles.detalhe}>
                   Cadastrado em: {new Date(item.criadoEm).toLocaleDateString("pt-BR")}
+                </Text>
+                <Text style={styles.detalheValor}>
+                  {formatarMoeda(valorTotalCliente(item.produtosInteresse))}
                 </Text>
               </Pressable>
             );
@@ -268,6 +285,17 @@ const styles = StyleSheet.create({
   opcaoSelecionada: { backgroundColor: colors.primary, borderColor: colors.primary },
   opcaoTexto: { color: colors.textMuted, fontFamily: "Prompt_400Regular", fontSize: 13 },
   opcaoTextoSelecionado: { color: colors.surface, fontFamily: "Prompt_600SemiBold" },
+  totalFiltroLinha: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  totalFiltroLabel: { fontFamily: "Prompt_400Regular", color: colors.textMuted, fontSize: 13 },
+  totalFiltroValor: { fontFamily: "Prompt_700Bold", color: colors.primary, fontSize: 16 },
   botaoExportar: {
     backgroundColor: colors.primary,
     borderRadius: 8,
@@ -297,4 +325,5 @@ const styles = StyleSheet.create({
   tagEstagio: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   tagEstagioTexto: { color: colors.surface, fontSize: 11, fontFamily: "Prompt_600SemiBold" },
   detalhe: { fontSize: 14, fontFamily: "Prompt_400Regular", color: colors.text, marginBottom: 2 },
+  detalheValor: { fontSize: 14, fontFamily: "Prompt_600SemiBold", color: colors.primary, marginTop: 2 },
 });
