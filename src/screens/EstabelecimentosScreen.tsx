@@ -2,6 +2,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -13,6 +14,7 @@ import {
 } from "react-native";
 import { AppStackParamList } from "../navigation/types";
 import {
+  atualizarEstabelecimento,
   criarEstabelecimento,
   Estabelecimento,
   ouvirEstabelecimentos,
@@ -26,6 +28,8 @@ export default function EstabelecimentosScreen({ navigation }: Props) {
   const [nome, setNome] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [nomeEdicao, setNomeEdicao] = useState("");
 
   useEffect(() => ouvirEstabelecimentos(setEstabelecimentos), []);
 
@@ -48,6 +52,30 @@ export default function EstabelecimentosScreen({ navigation }: Props) {
       setErro("Não foi possível salvar. Tente novamente.");
     } finally {
       setSalvando(false);
+    }
+  }
+
+  function iniciarEdicao(estabelecimento: Estabelecimento) {
+    setEditandoId(estabelecimento.id);
+    setNomeEdicao(estabelecimento.nome);
+  }
+
+  async function salvarEdicao(id: string) {
+    const nomeLimpo = nomeEdicao.trim();
+    if (!nomeLimpo) return;
+    if (
+      estabelecimentos.some(
+        (e) => e.id !== id && e.nome.toLowerCase() === nomeLimpo.toLowerCase()
+      )
+    ) {
+      Alert.alert("Erro", "Já existe um estabelecimento com esse nome.");
+      return;
+    }
+    try {
+      await atualizarEstabelecimento(id, nomeLimpo);
+      setEditandoId(null);
+    } catch {
+      Alert.alert("Erro", "Não foi possível salvar a alteração. Tente novamente.");
     }
   }
 
@@ -80,20 +108,42 @@ export default function EstabelecimentosScreen({ navigation }: Props) {
         ListEmptyComponent={
           <Text style={styles.vazio}>Nenhum estabelecimento cadastrado ainda.</Text>
         }
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.item}
-            onPress={() =>
-              navigation.navigate("Produtos", {
-                estabelecimentoId: item.id,
-                estabelecimentoNome: item.nome,
-              })
-            }
-          >
-            <Text style={styles.itemTexto}>{item.nome}</Text>
-            <Text style={styles.itemSeta}>Produtos ›</Text>
-          </Pressable>
-        )}
+        renderItem={({ item }) =>
+          editandoId === item.id ? (
+            <View style={styles.item}>
+              <TextInput
+                style={styles.inputEdicao}
+                value={nomeEdicao}
+                onChangeText={setNomeEdicao}
+                autoFocus
+              />
+              <Pressable onPress={() => salvarEdicao(item.id)}>
+                <Text style={styles.acaoSalvar}>Salvar</Text>
+              </Pressable>
+              <Pressable onPress={() => setEditandoId(null)}>
+                <Text style={styles.acaoCancelar}>Cancelar</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.item}>
+              <Pressable
+                style={styles.itemNavegavel}
+                onPress={() =>
+                  navigation.navigate("Produtos", {
+                    estabelecimentoId: item.id,
+                    estabelecimentoNome: item.nome,
+                  })
+                }
+              >
+                <Text style={styles.itemTexto}>{item.nome}</Text>
+                <Text style={styles.itemSeta}>Produtos ›</Text>
+              </Pressable>
+              <Pressable onPress={() => iniciarEdicao(item)}>
+                <Text style={styles.acaoEditar}>Editar</Text>
+              </Pressable>
+            </View>
+          )
+        }
       />
     </KeyboardAvoidingView>
   );
@@ -108,6 +158,16 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 8,
     padding: 14,
+    fontSize: 15,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+  },
+  inputEdicao: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 8,
+    padding: 8,
     fontSize: 15,
     fontFamily: "Prompt_400Regular",
     color: colors.text,
@@ -131,7 +191,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    gap: 10,
   },
+  itemNavegavel: { flex: 1, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   itemTexto: { fontFamily: "Prompt_500Medium", color: colors.text, fontSize: 15 },
-  itemSeta: { fontFamily: "Prompt_400Regular", color: colors.accent, fontSize: 13 },
+  itemSeta: { fontFamily: "Prompt_400Regular", color: colors.accent, fontSize: 13, marginRight: 12 },
+  acaoEditar: { color: colors.accent, fontFamily: "Prompt_600SemiBold", fontSize: 13 },
+  acaoSalvar: { color: colors.success, fontFamily: "Prompt_600SemiBold", fontSize: 13 },
+  acaoCancelar: { color: colors.textMuted, fontFamily: "Prompt_400Regular", fontSize: 13 },
 });

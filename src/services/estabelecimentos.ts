@@ -44,6 +44,10 @@ export async function criarEstabelecimento(nome: string) {
   await addDoc(estabelecimentosRef(), { nome, criadoEm: serverTimestamp() });
 }
 
+export async function atualizarEstabelecimento(id: string, nome: string) {
+  await updateDoc(doc(db, "estabelecimentos", id), { nome });
+}
+
 export function ouvirProdutos(
   estabelecimentoId: string,
   callback: (produtos: Produto[]) => void
