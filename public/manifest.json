@@ -1,0 +1,25 @@
+{
+  "name": "Sinergia Comercial",
+  "short_name": "Sinergia",
+  "description": "App de vendas da equipe comercial da Sinergia Comunicação",
+  "start_url": "/vendedor-app/",
+  "scope": "/vendedor-app/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F6FA",
+  "theme_color": "#374F5F",
+  "icons": [
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

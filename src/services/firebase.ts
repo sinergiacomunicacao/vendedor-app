@@ -4,7 +4,12 @@ import { Auth, getAuth, initializeAuth } from "firebase/auth";
 // @ts-ignore - getReactNativePersistence exists at runtime but the firebase
 // package's TypeScript exports map does not resolve it for React Native.
 import { getReactNativePersistence } from "firebase/auth";
-import { Firestore, getFirestore } from "firebase/firestore";
+import {
+  Firestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 import { Platform } from "react-native";
 
 const firebaseConfig = {
@@ -31,4 +36,14 @@ export const auth: Auth = isFirebaseConfigured
     : initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) })
   : ({} as Auth);
 
-export const db: Firestore = isFirebaseConfigured ? getFirestore(app) : ({} as Firestore);
+// No web, o cache local persistente (IndexedDB) mantém os dados disponíveis
+// mesmo depois de recarregar a página ou perder o sinal. No app nativo via
+// Expo Go, o SDK já usa cache em memória por padrão, que também tolera
+// perda de sinal durante a sessão, então não precisa dessa configuração.
+export const db: Firestore = isFirebaseConfigured
+  ? Platform.OS === "web"
+    ? initializeFirestore(app, {
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      })
+    : initializeFirestore(app, {})
+  : ({} as Firestore);

@@ -1,6 +1,7 @@
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -17,6 +18,7 @@ type AuthContextValue = {
   loading: boolean;
   cadastrar: (nome: string, email: string, senha: string) => Promise<void>;
   entrar: (email: string, senha: string) => Promise<void>;
+  recuperarSenha: (email: string) => Promise<void>;
   sair: () => Promise<void>;
 };
 
@@ -56,13 +58,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, senha);
   }
 
+  async function recuperarSenha(email: string) {
+    await sendPasswordResetEmail(auth, email);
+  }
+
   async function sair() {
     await signOut(auth);
   }
 
   return (
     <AuthContext.Provider
-      value={{ user, papel, gestor: papel === "gestor", loading, cadastrar, entrar, sair }}
+      value={{
+        user,
+        papel,
+        gestor: papel === "gestor",
+        loading,
+        cadastrar,
+        entrar,
+        recuperarSenha,
+        sair,
+      }}
     >
       {children}
     </AuthContext.Provider>

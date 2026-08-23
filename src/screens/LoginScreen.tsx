@@ -18,11 +18,13 @@ import { colors } from "../theme/colors";
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
 export default function LoginScreen({ navigation }: Props) {
-  const { entrar } = useAuth();
+  const { entrar, recuperarSenha } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [modoRecuperacao, setModoRecuperacao] = useState(false);
+  const [recuperacaoEnviada, setRecuperacaoEnviada] = useState(false);
 
   async function handleEntrar() {
     setErro("");
@@ -40,6 +42,35 @@ export default function LoginScreen({ navigation }: Props) {
     }
   }
 
+  async function handleRecuperarSenha() {
+    setErro("");
+    if (!email) {
+      setErro("Informe seu email.");
+      return;
+    }
+    setCarregando(true);
+    try {
+      await recuperarSenha(email.trim());
+      setRecuperacaoEnviada(true);
+    } catch (e: any) {
+      // Não revela se o email existe ou não na base — evita que alguém use
+      // esse formulário para descobrir quais emails estão cadastrados.
+      if (e?.code === "auth/user-not-found") {
+        setRecuperacaoEnviada(true);
+      } else {
+        setErro(mensagemDeErro(e?.code));
+      }
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  function voltarParaLogin() {
+    setModoRecuperacao(false);
+    setRecuperacaoEnviada(false);
+    setErro("");
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -51,37 +82,80 @@ export default function LoginScreen({ navigation }: Props) {
         resizeMode="contain"
       />
       <Text style={styles.titulo}>Sinergia Comercial</Text>
-      <Text style={styles.subtitulo}>Entre com sua conta de vendedor</Text>
+      <Text style={styles.subtitulo}>
+        {modoRecuperacao ? "Recupere o acesso à sua conta" : "Entre com sua conta de vendedor"}
+      </Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Senha"
-        secureTextEntry
-        value={senha}
-        onChangeText={setSenha}
-      />
-
-      {erro ? <Text style={styles.erro}>{erro}</Text> : null}
-
-      <Pressable style={styles.botao} onPress={handleEntrar} disabled={carregando}>
-        {carregando ? (
-          <ActivityIndicator color={colors.surface} />
+      {modoRecuperacao ? (
+        recuperacaoEnviada ? (
+          <>
+            <Text style={styles.mensagemSucesso}>
+              Enviamos um link de recuperação para {email.trim()}. Verifique sua caixa de
+              entrada (e o spam).
+            </Text>
+            <Pressable style={styles.botao} onPress={voltarParaLogin}>
+              <Text style={styles.botaoTexto}>Voltar para o login</Text>
+            </Pressable>
+          </>
         ) : (
-          <Text style={styles.botaoTexto}>Entrar</Text>
-        )}
-      </Pressable>
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
+            />
+            {erro ? <Text style={styles.erro}>{erro}</Text> : null}
+            <Pressable style={styles.botao} onPress={handleRecuperarSenha} disabled={carregando}>
+              {carregando ? (
+                <ActivityIndicator color={colors.surface} />
+              ) : (
+                <Text style={styles.botaoTexto}>Enviar link de recuperação</Text>
+              )}
+            </Pressable>
+            <Pressable onPress={voltarParaLogin}>
+              <Text style={styles.link}>Voltar para o login</Text>
+            </Pressable>
+          </>
+        )
+      ) : (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            autoCapitalize="none"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Senha"
+            secureTextEntry
+            value={senha}
+            onChangeText={setSenha}
+          />
 
-      <Pressable onPress={() => navigation.navigate("Cadastro")}>
-        <Text style={styles.link}>Ainda não tem conta? Cadastre-se</Text>
-      </Pressable>
+          {erro ? <Text style={styles.erro}>{erro}</Text> : null}
+
+          <Pressable style={styles.botao} onPress={handleEntrar} disabled={carregando}>
+            {carregando ? (
+              <ActivityIndicator color={colors.surface} />
+            ) : (
+              <Text style={styles.botaoTexto}>Entrar</Text>
+            )}
+          </Pressable>
+
+          <Pressable onPress={() => setModoRecuperacao(true)}>
+            <Text style={styles.link}>Esqueci minha senha</Text>
+          </Pressable>
+          <Pressable onPress={() => navigation.navigate("Cadastro")}>
+            <Text style={styles.link}>Ainda não tem conta? Cadastre-se</Text>
+          </Pressable>
+        </>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -136,6 +210,13 @@ const styles = StyleSheet.create({
     fontFamily: "Prompt_400Regular",
     marginBottom: 12,
     textAlign: "center",
+  },
+  mensagemSucesso: {
+    color: colors.success,
+    fontFamily: "Prompt_400Regular",
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 20,
   },
   botao: {
     backgroundColor: colors.primary,

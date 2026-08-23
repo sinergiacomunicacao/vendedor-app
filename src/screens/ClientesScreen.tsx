@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { AppStackParamList } from "../navigation/types";
 import { ouvirClientesDoVendedor } from "../services/clientes";
@@ -24,12 +24,24 @@ type Props = NativeStackScreenProps<AppStackParamList, "Clientes">;
 export default function ClientesScreen({ navigation }: Props) {
   const { user, gestor, sair } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [busca, setBusca] = useState("");
 
   useEffect(() => {
     if (!user) return;
     const unsubscribe = ouvirClientesDoVendedor(user.uid, setClientes);
     return unsubscribe;
   }, [user]);
+
+  const clientesFiltrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return clientes;
+    return clientes.filter((cliente) =>
+      [cliente.razaoSocial, cliente.cnpj, cliente.telefone, cliente.email, cliente.estabelecimento]
+        .join(" ")
+        .toLowerCase()
+        .includes(termo)
+    );
+  }, [clientes, busca]);
 
   const renderItem = useCallback(
     ({ item }: { item: Cliente }) => {
@@ -76,8 +88,9 @@ export default function ClientesScreen({ navigation }: Props) {
         <View>
           <Text style={styles.saudacao}>Olá, {user?.displayName ?? "vendedor"}</Text>
           <Text style={styles.contagem}>
-            {clientes.length} cliente{clientes.length === 1 ? "" : "s"} cadastrado
-            {clientes.length === 1 ? "" : "s"}
+            {busca.trim()
+              ? `${clientesFiltrados.length} de ${clientes.length} cliente${clientes.length === 1 ? "" : "s"}`
+              : `${clientes.length} cliente${clientes.length === 1 ? "" : "s"} cadastrado${clientes.length === 1 ? "" : "s"}`}
           </Text>
         </View>
         <View style={styles.headerAcoes}>
@@ -97,12 +110,25 @@ export default function ClientesScreen({ navigation }: Props) {
         </View>
       </View>
 
+      {clientes.length > 0 && (
+        <View style={styles.buscaContainer}>
+          <TextInput
+            style={styles.buscaInput}
+            placeholder="Buscar por nome, CNPJ, telefone, email ou estabelecimento"
+            value={busca}
+            onChangeText={setBusca}
+          />
+        </View>
+      )}
+
       <FlatList
-        data={clientes}
+        data={clientesFiltrados}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.lista}
         ListEmptyComponent={
-          <Text style={styles.vazio}>Nenhum cliente cadastrado ainda.</Text>
+          <Text style={styles.vazio}>
+            {busca.trim() ? "Nenhum cliente encontrado." : "Nenhum cliente cadastrado ainda."}
+          </Text>
         }
         renderItem={renderItem}
       />
@@ -131,6 +157,24 @@ const styles = StyleSheet.create({
   headerAcoes: { flexDirection: "row", alignItems: "center", gap: 16 },
   link: { color: colors.accent, fontFamily: "Prompt_600SemiBold" },
   sair: { color: colors.danger, fontFamily: "Prompt_600SemiBold" },
+  buscaContainer: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  buscaInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+    backgroundColor: colors.background,
+  },
   lista: { padding: 16, paddingBottom: 100 },
   vazio: { textAlign: "center", color: colors.textMuted, fontFamily: "Prompt_400Regular", marginTop: 40 },
   card: {
