@@ -3,7 +3,7 @@
 ## 1. Exportar build web
 Rodar na raiz do projeto Expo:
 ```bash
-npx expo export -w
+npx expo export --platform web
 ```
 Gera a pasta `dist/` com os arquivos estáticos (HTML/JS/CSS).
 
@@ -24,7 +24,7 @@ git subtree push --prefix dist origin gh-pages
 
 Para atualizar depois de uma mudança:
 ```bash
-npx expo export -w
+npx expo export --platform web
 git add dist -f
 git commit -m "update"
 git subtree push --prefix dist origin gh-pages
