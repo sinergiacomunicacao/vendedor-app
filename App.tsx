@@ -9,6 +9,7 @@ import {
 } from "@expo-google-fonts/prompt";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import AlertHost from "./src/components/AlertHost";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { AppStackParamList, AuthStackParamList } from "./src/navigation/types";
 import { isFirebaseConfigured } from "./src/services/firebase";
@@ -146,6 +147,7 @@ export default function App() {
       ) : (
         <ConfiguracaoPendente />
       )}
+      <AlertHost />
     </>
   );
 }

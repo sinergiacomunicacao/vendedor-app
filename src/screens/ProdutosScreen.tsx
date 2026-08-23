@@ -2,7 +2,6 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -21,6 +20,7 @@ import {
   Produto,
 } from "../services/estabelecimentos";
 import { colors } from "../theme/colors";
+import { showAlert } from "../utils/alert";
 import { formatarMoeda, maskMoeda, parseMoeda } from "../utils/format";
 
 type Props = NativeStackScreenProps<AppStackParamList, "Produtos">;
@@ -92,12 +92,12 @@ export default function ProdutosScreen({ route }: Props) {
       });
       setEditandoId(null);
     } catch {
-      Alert.alert("Erro", "Não foi possível salvar a alteração. Tente novamente.");
+      showAlert("Erro", "Não foi possível salvar a alteração. Tente novamente.");
     }
   }
 
   function handleExcluir(produto: Produto) {
-    Alert.alert("Excluir produto", `Remover "${produto.nome}"?`, [
+    showAlert("Excluir produto", `Remover "${produto.nome}"?`, [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Excluir",
@@ -106,7 +106,7 @@ export default function ProdutosScreen({ route }: Props) {
           try {
             await excluirProduto(estabelecimentoId, produto.id);
           } catch {
-            Alert.alert("Erro", "Não foi possível excluir o produto. Tente novamente.");
+            showAlert("Erro", "Não foi possível excluir o produto. Tente novamente.");
           }
         },
       },

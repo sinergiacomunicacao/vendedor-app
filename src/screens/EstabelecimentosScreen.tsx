@@ -2,7 +2,6 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -20,6 +19,7 @@ import {
   ouvirEstabelecimentos,
 } from "../services/estabelecimentos";
 import { colors } from "../theme/colors";
+import { showAlert } from "../utils/alert";
 
 type Props = NativeStackScreenProps<AppStackParamList, "Estabelecimentos">;
 
@@ -68,14 +68,14 @@ export default function EstabelecimentosScreen({ navigation }: Props) {
         (e) => e.id !== id && e.nome.toLowerCase() === nomeLimpo.toLowerCase()
       )
     ) {
-      Alert.alert("Erro", "Já existe um estabelecimento com esse nome.");
+      showAlert("Erro", "Já existe um estabelecimento com esse nome.");
       return;
     }
     try {
       await atualizarEstabelecimento(id, nomeLimpo);
       setEditandoId(null);
     } catch {
-      Alert.alert("Erro", "Não foi possível salvar a alteração. Tente novamente.");
+      showAlert("Erro", "Não foi possível salvar a alteração. Tente novamente.");
     }
   }
 

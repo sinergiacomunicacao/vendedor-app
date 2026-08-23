@@ -2,7 +2,6 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import { db } from "../services/firebase";
 import { atualizarEstagioCliente, atualizarObservacoesCliente, excluirCliente } from "../services/clientes";
 import { colors } from "../theme/colors";
 import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse, valorTotalCliente } from "../types";
+import { showAlert } from "../utils/alert";
 import { formatarMoeda } from "../utils/format";
 
 const CORES_ESTAGIO: Record<Estagio, string> = {
@@ -53,7 +53,7 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
     try {
       await atualizarObservacoesCliente(cliente.id, observacoes);
     } catch {
-      Alert.alert("Erro", "Não foi possível salvar as observações. Tente novamente.");
+      showAlert("Erro", "Não foi possível salvar as observações. Tente novamente.");
     } finally {
       setSalvandoObservacoes(false);
     }
@@ -65,14 +65,14 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
     try {
       await atualizarEstagioCliente(cliente.id, estagio);
     } catch {
-      Alert.alert("Erro", "Não foi possível atualizar o estágio. Tente novamente.");
+      showAlert("Erro", "Não foi possível atualizar o estágio. Tente novamente.");
     } finally {
       setMudandoEstagio(false);
     }
   }
 
   function handleCancelar() {
-    Alert.alert(
+    showAlert(
       "Cancelar cliente",
       `Remover a ficha de "${cliente?.razaoSocial}"? Essa ação não pode ser desfeita.`,
       [
@@ -88,7 +88,7 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
               navigation.goBack();
             } catch {
               setExcluindo(false);
-              Alert.alert("Erro", "Não foi possível cancelar o cliente. Tente novamente.");
+              showAlert("Erro", "Não foi possível cancelar o cliente. Tente novamente.");
             }
           },
         },
