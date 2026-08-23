@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { AppStackParamList } from "../navigation/types";
 import { ouvirClientesDoVendedor } from "../services/clientes";
@@ -92,13 +92,20 @@ export default function ClientesScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.saudacao}>Olá, {user?.displayName ?? "vendedor"}</Text>
-          <Text style={styles.contagem}>
-            {busca.trim()
-              ? `${clientesFiltrados.length} de ${clientes.length} cliente${clientes.length === 1 ? "" : "s"}`
-              : `${clientes.length} cliente${clientes.length === 1 ? "" : "s"} cadastrado${clientes.length === 1 ? "" : "s"}`}
-          </Text>
+        <View style={styles.marca}>
+          <Image
+            source={require("../../assets/logo-mark.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <View>
+            <Text style={styles.saudacao}>Olá, {user?.displayName ?? "vendedor"}</Text>
+            <Text style={styles.contagem}>
+              {busca.trim()
+                ? `${clientesFiltrados.length} de ${clientes.length} cliente${clientes.length === 1 ? "" : "s"}`
+                : `${clientes.length} cliente${clientes.length === 1 ? "" : "s"} cadastrado${clientes.length === 1 ? "" : "s"}`}
+            </Text>
+          </View>
         </View>
         <View style={styles.headerAcoes}>
           {gestor && (
@@ -159,6 +166,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  marca: { flexDirection: "row", alignItems: "center", gap: 10 },
+  logo: { width: 34, height: 34 },
   saudacao: { fontSize: 18, fontFamily: "Prompt_600SemiBold", color: colors.primary },
   contagem: { fontSize: 13, fontFamily: "Prompt_400Regular", color: colors.textMuted, marginTop: 2 },
   headerAcoes: { flexDirection: "row", alignItems: "center", gap: 16 },
