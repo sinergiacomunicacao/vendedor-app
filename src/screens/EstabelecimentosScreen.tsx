@@ -154,6 +154,7 @@ const styles = StyleSheet.create({
   form: { flexDirection: "row", gap: 8 },
   input: {
     flex: 1,
+    minWidth: 0,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
@@ -164,6 +165,7 @@ const styles = StyleSheet.create({
   },
   inputEdicao: {
     flex: 1,
+    minWidth: 0,
     borderWidth: 1,
     borderColor: colors.accent,
     borderRadius: 8,

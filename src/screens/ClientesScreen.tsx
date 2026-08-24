@@ -1,6 +1,7 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
 import { AppStackParamList } from "../navigation/types";
 import { ouvirClientesDoVendedor } from "../services/clientes";
@@ -23,8 +24,15 @@ type Props = NativeStackScreenProps<AppStackParamList, "Clientes">;
 
 export default function ClientesScreen({ navigation }: Props) {
   const { user, gestor, sair } = useAuth();
+  const insets = useSafeAreaInsets();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [busca, setBusca] = useState("");
+  const [menuAberto, setMenuAberto] = useState(false);
+
+  function irPara(tela: "Relatorio" | "Estabelecimentos" | "PrazosContrato") {
+    setMenuAberto(false);
+    navigation.navigate(tela);
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -91,15 +99,17 @@ export default function ClientesScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <View style={styles.marca}>
           <Image
             source={require("../../assets/logo-mark.png")}
             style={styles.logo}
             resizeMode="contain"
           />
-          <View>
-            <Text style={styles.saudacao}>Olá, {user?.displayName ?? "vendedor"}</Text>
+          <View style={styles.marcaTexto}>
+            <Text style={styles.saudacao} numberOfLines={1}>
+              Olá, {user?.displayName ?? "vendedor"}
+            </Text>
             <Text style={styles.contagem}>
               {busca.trim()
                 ? `${clientesFiltrados.length} de ${clientes.length} cliente${clientes.length === 1 ? "" : "s"}`
@@ -109,25 +119,36 @@ export default function ClientesScreen({ navigation }: Props) {
         </View>
         <View style={styles.headerAcoes}>
           {gestor && (
-            <Pressable onPress={() => navigation.navigate("Relatorio")}>
-              <Text style={styles.link}>Relatório</Text>
+            <Pressable onPress={() => setMenuAberto(true)} hitSlop={8}>
+              <Text style={styles.link}>Menu</Text>
             </Pressable>
           )}
-          {gestor && (
-            <Pressable onPress={() => navigation.navigate("Estabelecimentos")}>
-              <Text style={styles.link}>Estabelecimentos</Text>
-            </Pressable>
-          )}
-          {gestor && (
-            <Pressable onPress={() => navigation.navigate("PrazosContrato")}>
-              <Text style={styles.link}>Prazos</Text>
-            </Pressable>
-          )}
-          <Pressable onPress={sair}>
+          <Pressable onPress={sair} hitSlop={8}>
             <Text style={styles.sair}>Sair</Text>
           </Pressable>
         </View>
       </View>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={menuAberto}
+        onRequestClose={() => setMenuAberto(false)}
+      >
+        <Pressable style={styles.menuFundo} onPress={() => setMenuAberto(false)}>
+          <View style={[styles.menuCaixa, { marginTop: insets.top + 70 }]}>
+            <Pressable style={styles.menuItem} onPress={() => irPara("Relatorio")}>
+              <Text style={styles.menuItemTexto}>Relatório</Text>
+            </Pressable>
+            <Pressable style={styles.menuItem} onPress={() => irPara("Estabelecimentos")}>
+              <Text style={styles.menuItemTexto}>Estabelecimentos</Text>
+            </Pressable>
+            <Pressable style={[styles.menuItem, styles.menuItemUltimo]} onPress={() => irPara("PrazosContrato")}>
+              <Text style={styles.menuItemTexto}>Prazos de contrato</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       {clientes.length > 0 && (
         <View style={styles.buscaContainer}>
@@ -165,19 +186,43 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
-    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    gap: 12,
   },
-  marca: { flexDirection: "row", alignItems: "center", gap: 10 },
-  logo: { width: 34, height: 34 },
+  marca: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, minWidth: 0 },
+  marcaTexto: { flex: 1, minWidth: 0 },
+  logo: { width: 34, height: 34, flexShrink: 0 },
   saudacao: { fontSize: 18, fontFamily: "Prompt_600SemiBold", color: colors.primary },
   contagem: { fontSize: 13, fontFamily: "Prompt_400Regular", color: colors.textMuted, marginTop: 2 },
-  headerAcoes: { flexDirection: "row", alignItems: "center", gap: 16 },
+  headerAcoes: { flexDirection: "row", alignItems: "center", gap: 16, flexShrink: 0 },
   link: { color: colors.accent, fontFamily: "Prompt_600SemiBold" },
   sair: { color: colors.danger, fontFamily: "Prompt_600SemiBold" },
+  menuFundo: { flex: 1, backgroundColor: "#00000055" },
+  menuCaixa: {
+    marginRight: 20,
+    marginLeft: "auto",
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    paddingVertical: 6,
+    width: 220,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  menuItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  menuItemUltimo: { borderBottomWidth: 0 },
+  menuItemTexto: { color: colors.text, fontFamily: "Prompt_500Medium", fontSize: 15 },
   buscaContainer: {
     backgroundColor: colors.surface,
     paddingHorizontal: 16,

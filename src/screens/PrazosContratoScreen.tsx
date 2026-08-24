@@ -106,20 +106,22 @@ export default function PrazosContratoScreen() {
         com seu percentual de desconto sobre o valor de tabela.
       </Text>
       <View style={styles.form}>
-        <TextInput
-          style={styles.inputMeses}
-          placeholder="Meses"
-          keyboardType="number-pad"
-          value={meses}
-          onChangeText={setMeses}
-        />
-        <TextInput
-          style={styles.inputDesconto}
-          placeholder="Desconto %"
-          keyboardType="number-pad"
-          value={desconto}
-          onChangeText={setDesconto}
-        />
+        <View style={styles.formLinha}>
+          <TextInput
+            style={styles.inputMeses}
+            placeholder="Meses"
+            keyboardType="number-pad"
+            value={meses}
+            onChangeText={setMeses}
+          />
+          <TextInput
+            style={styles.inputDesconto}
+            placeholder="Desconto %"
+            keyboardType="number-pad"
+            value={desconto}
+            onChangeText={setDesconto}
+          />
+        </View>
         <Pressable style={styles.botao} onPress={handleAdicionar} disabled={salvando}>
           {salvando ? (
             <ActivityIndicator color={colors.surface} />
@@ -195,7 +197,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     lineHeight: 18,
   },
-  form: { flexDirection: "row", gap: 8 },
+  form: { gap: 8 },
+  formLinha: { flexDirection: "row", gap: 8 },
   inputMeses: {
     width: 110,
     borderWidth: 1,
@@ -209,6 +212,7 @@ const styles = StyleSheet.create({
   },
   inputDesconto: {
     flex: 1,
+    minWidth: 0,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
@@ -240,7 +244,7 @@ const styles = StyleSheet.create({
   botao: {
     backgroundColor: colors.primary,
     borderRadius: 8,
-    paddingHorizontal: 18,
+    padding: 14,
     justifyContent: "center",
     alignItems: "center",
   },

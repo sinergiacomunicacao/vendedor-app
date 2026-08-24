@@ -9,7 +9,9 @@ import {
 } from "@expo-google-fonts/prompt";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import AlertHost from "./src/components/AlertHost";
+import Onboarding from "./src/components/Onboarding";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { AppStackParamList, AuthStackParamList } from "./src/navigation/types";
 import { isFirebaseConfigured } from "./src/services/firebase";
@@ -53,6 +55,7 @@ function Root() {
 
   return (
     <NavigationContainer>
+      {user && <Onboarding />}
       {user ? (
         <AppStack.Navigator screenOptions={{ headerShown: false }}>
           <AppStack.Screen name="Clientes" component={ClientesScreen} />
@@ -150,7 +153,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar style="dark" />
       {isFirebaseConfigured ? (
         <AuthProvider>
@@ -160,7 +163,7 @@ export default function App() {
         <ConfiguracaoPendente />
       )}
       <AlertHost />
-    </>
+    </SafeAreaProvider>
   );
 }
 

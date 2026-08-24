@@ -294,6 +294,7 @@ const styles = StyleSheet.create({
   linhaData: { flexDirection: "row", gap: 8 },
   inputData: {
     flex: 1,
+    minWidth: 0,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,

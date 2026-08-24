@@ -140,14 +140,14 @@ export default function ProdutosScreen({ route }: Props) {
             value={valorTabela}
             onChangeText={(v) => setValorTabela(maskMoeda(v))}
           />
-          <Pressable style={styles.botao} onPress={handleAdicionar} disabled={salvando}>
-            {salvando ? (
-              <ActivityIndicator color={colors.surface} />
-            ) : (
-              <Text style={styles.botaoTexto}>Adicionar</Text>
-            )}
-          </Pressable>
         </View>
+        <Pressable style={styles.botao} onPress={handleAdicionar} disabled={salvando}>
+          {salvando ? (
+            <ActivityIndicator color={colors.surface} />
+          ) : (
+            <Text style={styles.botaoTexto}>Adicionar</Text>
+          )}
+        </Pressable>
       </View>
       {erro ? <Text style={styles.erro}>{erro}</Text> : null}
 
@@ -238,6 +238,7 @@ const styles = StyleSheet.create({
   },
   inputValor: {
     flex: 1,
+    minWidth: 0,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
@@ -279,7 +280,7 @@ const styles = StyleSheet.create({
   botao: {
     backgroundColor: colors.primary,
     borderRadius: 8,
-    paddingHorizontal: 18,
+    padding: 14,
     justifyContent: "center",
     alignItems: "center",
   },
