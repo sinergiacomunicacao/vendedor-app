@@ -52,8 +52,8 @@ export default function RelatorioScreen({ navigation }: Props) {
   const [buscaCliente, setBuscaCliente] = useState("");
   const [exportando, setExportando] = useState(false);
 
-  function alternarNaLista<T>(lista: T[], valor: T, setLista: (l: T[]) => void) {
-    setLista(lista.includes(valor) ? lista.filter((v) => v !== valor) : [...lista, valor]);
+  function alternarNaLista<T>(valor: T, setLista: (atualizar: (l: T[]) => T[]) => void) {
+    setLista((atual) => (atual.includes(valor) ? atual.filter((v) => v !== valor) : [...atual, valor]));
   }
 
   useEffect(() => {
@@ -194,7 +194,7 @@ export default function RelatorioScreen({ navigation }: Props) {
               <Pressable
                 key={v.id}
                 style={[styles.opcao, ativo && styles.opcaoSelecionada]}
-                onPress={() => alternarNaLista(vendedorIds, v.id, setVendedorIds)}
+                onPress={() => alternarNaLista(v.id, setVendedorIds)}
               >
                 <Text style={[styles.opcaoTexto, ativo && styles.opcaoTextoSelecionado]}>
                   {v.nome}
@@ -227,7 +227,7 @@ export default function RelatorioScreen({ navigation }: Props) {
               <Pressable
                 key={e.id}
                 style={[styles.opcao, ativo && styles.opcaoSelecionada]}
-                onPress={() => alternarNaLista(estabelecimentoNomes, e.nome, setEstabelecimentoNomes)}
+                onPress={() => alternarNaLista(e.nome, setEstabelecimentoNomes)}
               >
                 <Text style={[styles.opcaoTexto, ativo && styles.opcaoTextoSelecionado]}>
                   {e.nome}
@@ -246,7 +246,7 @@ export default function RelatorioScreen({ navigation }: Props) {
               <Pressable
                 key={c.id}
                 style={[styles.opcao, styles.opcaoSelecionada]}
-                onPress={() => alternarNaLista(clienteIds, c.id, setClienteIds)}
+                onPress={() => alternarNaLista(c.id, setClienteIds)}
               >
                 <Text style={styles.opcaoTextoSelecionado}>{c.razaoSocial} ×</Text>
               </Pressable>
@@ -267,7 +267,7 @@ export default function RelatorioScreen({ navigation }: Props) {
                 <Pressable
                   key={c.id}
                   style={[styles.opcao, ativo && styles.opcaoSelecionada]}
-                  onPress={() => alternarNaLista(clienteIds, c.id, setClienteIds)}
+                  onPress={() => alternarNaLista(c.id, setClienteIds)}
                 >
                   <Text style={[styles.opcaoTexto, ativo && styles.opcaoTextoSelecionado]}>
                     {c.razaoSocial}
