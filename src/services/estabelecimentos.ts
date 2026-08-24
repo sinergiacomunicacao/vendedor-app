@@ -3,11 +3,13 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -46,6 +48,14 @@ export async function criarEstabelecimento(nome: string) {
 
 export async function atualizarEstabelecimento(id: string, nome: string) {
   await updateDoc(doc(db, "estabelecimentos", id), { nome });
+}
+
+export async function excluirEstabelecimento(id: string) {
+  const produtosSnap = await getDocs(produtosRef(id));
+  const batch = writeBatch(db);
+  produtosSnap.docs.forEach((produtoDoc) => batch.delete(produtoDoc.ref));
+  batch.delete(doc(db, "estabelecimentos", id));
+  await batch.commit();
 }
 
 export function ouvirProdutos(

@@ -196,8 +196,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
           nome: p.nome,
           quantidade: quantidades[p.id],
           valorUnitario: valorComDesconto(p, prazoId),
-          prazoMeses: prazo?.meses,
-          descontoPercentual: prazo?.descontoPercentual,
+          ...(prazo ? { prazoMeses: prazo.meses, descontoPercentual: prazo.descontoPercentual } : {}),
         };
       });
     if (produtosSelecionados.length === 0) {

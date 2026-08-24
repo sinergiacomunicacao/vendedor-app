@@ -46,6 +46,7 @@ export type Cliente = {
   cancelado?: boolean;
   motivoCancelamento?: string;
   canceladoEm?: number;
+  dataFechamento?: number;
   criadoEm: number;
 };
 

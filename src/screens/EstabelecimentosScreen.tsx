@@ -16,6 +16,7 @@ import {
   atualizarEstabelecimento,
   criarEstabelecimento,
   Estabelecimento,
+  excluirEstabelecimento,
   ouvirEstabelecimentos,
 } from "../services/estabelecimentos";
 import { colors } from "../theme/colors";
@@ -30,6 +31,7 @@ export default function EstabelecimentosScreen({ navigation }: Props) {
   const [salvando, setSalvando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nomeEdicao, setNomeEdicao] = useState("");
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
 
   useEffect(() => ouvirEstabelecimentos(setEstabelecimentos), []);
 
@@ -77,6 +79,30 @@ export default function EstabelecimentosScreen({ navigation }: Props) {
     } catch {
       showAlert("Erro", "Não foi possível salvar a alteração. Tente novamente.");
     }
+  }
+
+  function handleExcluir(estabelecimento: Estabelecimento) {
+    showAlert(
+      "Excluir estabelecimento",
+      `Remover "${estabelecimento.nome}"? Todos os produtos cadastrados nele também serão excluídos. Clientes já cadastrados não são afetados.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: async () => {
+            setExcluindoId(estabelecimento.id);
+            try {
+              await excluirEstabelecimento(estabelecimento.id);
+            } catch {
+              showAlert("Erro", "Não foi possível excluir o estabelecimento. Tente novamente.");
+            } finally {
+              setExcluindoId(null);
+            }
+          },
+        },
+      ]
+    );
   }
 
   return (
@@ -138,9 +164,18 @@ export default function EstabelecimentosScreen({ navigation }: Props) {
                 <Text style={styles.itemTexto}>{item.nome}</Text>
                 <Text style={styles.itemSeta}>Produtos ›</Text>
               </Pressable>
-              <Pressable onPress={() => iniciarEdicao(item)}>
-                <Text style={styles.acaoEditar}>Editar</Text>
-              </Pressable>
+              <View style={styles.acoes}>
+                <Pressable onPress={() => iniciarEdicao(item)} disabled={excluindoId === item.id}>
+                  <Text style={styles.acaoEditar}>Editar</Text>
+                </Pressable>
+                {excluindoId === item.id ? (
+                  <ActivityIndicator color={colors.danger} size="small" />
+                ) : (
+                  <Pressable onPress={() => handleExcluir(item)}>
+                    <Text style={styles.acaoExcluir}>Excluir</Text>
+                  </Pressable>
+                )}
+              </View>
             </View>
           )
         }
@@ -198,7 +233,9 @@ const styles = StyleSheet.create({
   itemNavegavel: { flex: 1, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   itemTexto: { fontFamily: "Prompt_500Medium", color: colors.text, fontSize: 15 },
   itemSeta: { fontFamily: "Prompt_400Regular", color: colors.accent, fontSize: 13, marginRight: 12 },
+  acoes: { flexDirection: "row", alignItems: "center", gap: 16 },
   acaoEditar: { color: colors.accent, fontFamily: "Prompt_600SemiBold", fontSize: 13 },
+  acaoExcluir: { color: colors.danger, fontFamily: "Prompt_600SemiBold", fontSize: 13 },
   acaoSalvar: { color: colors.success, fontFamily: "Prompt_600SemiBold", fontSize: 13 },
   acaoCancelar: { color: colors.textMuted, fontFamily: "Prompt_400Regular", fontSize: 13 },
 });

@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   limit,
@@ -155,6 +156,12 @@ export async function atualizarCliente(
 
 export async function atualizarObservacoesCliente(id: string, observacoes: string) {
   await updateDoc(doc(db, "clientes", id), { observacoes: observacoes.trim() });
+}
+
+export async function atualizarDataFechamentoCliente(id: string, dataFechamento: number | null) {
+  await updateDoc(doc(db, "clientes", id), {
+    dataFechamento: dataFechamento === null ? deleteField() : dataFechamento,
+  });
 }
 
 export async function cancelarCliente(cliente: Cliente, motivo: string) {

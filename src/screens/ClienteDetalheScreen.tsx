@@ -13,7 +13,12 @@ import {
 import { doc, onSnapshot } from "firebase/firestore";
 import { AppStackParamList } from "../navigation/types";
 import { db } from "../services/firebase";
-import { atualizarEstagioCliente, atualizarObservacoesCliente, cancelarCliente } from "../services/clientes";
+import {
+  atualizarDataFechamentoCliente,
+  atualizarEstagioCliente,
+  atualizarObservacoesCliente,
+  cancelarCliente,
+} from "../services/clientes";
 import { colors } from "../theme/colors";
 import {
   Cliente,
@@ -24,7 +29,7 @@ import {
   valorTotalCliente,
 } from "../types";
 import { showAlert } from "../utils/alert";
-import { formatarMoeda } from "../utils/format";
+import { formatarMoeda, maskData, parseData } from "../utils/format";
 
 const CORES_ESTAGIO: Record<Estagio, string> = {
   contato: colors.accent,
@@ -43,6 +48,9 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
   const [mudandoEstagio, setMudandoEstagio] = useState(false);
   const [observacoes, setObservacoes] = useState("");
   const [salvandoObservacoes, setSalvandoObservacoes] = useState(false);
+  const [dataFechamentoTexto, setDataFechamentoTexto] = useState("");
+  const [erroDataFechamento, setErroDataFechamento] = useState("");
+  const [salvandoDataFechamento, setSalvandoDataFechamento] = useState(false);
   const [modalCancelar, setModalCancelar] = useState(false);
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
 
@@ -54,7 +62,11 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
   }, [clienteId]);
 
   useEffect(() => {
-    if (cliente) setObservacoes(cliente.observacoes ?? "");
+    if (!cliente) return;
+    setObservacoes(cliente.observacoes ?? "");
+    setDataFechamentoTexto(
+      cliente.dataFechamento ? new Date(cliente.dataFechamento).toLocaleDateString("pt-BR") : ""
+    );
   }, [cliente?.id]);
 
   async function handleSalvarObservacoes() {
@@ -66,6 +78,25 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
       showAlert("Erro", "Não foi possível salvar as observações. Tente novamente.");
     } finally {
       setSalvandoObservacoes(false);
+    }
+  }
+
+  async function handleSalvarDataFechamento() {
+    if (!cliente) return;
+    setErroDataFechamento("");
+    const textoLimpo = dataFechamentoTexto.trim();
+    const timestamp = textoLimpo ? parseData(textoLimpo) : null;
+    if (textoLimpo && timestamp === null) {
+      setErroDataFechamento("Data inválida.");
+      return;
+    }
+    setSalvandoDataFechamento(true);
+    try {
+      await atualizarDataFechamentoCliente(cliente.id, timestamp);
+    } catch {
+      showAlert("Erro", "Não foi possível salvar a data de fechamento. Tente novamente.");
+    } finally {
+      setSalvandoDataFechamento(false);
     }
   }
 
@@ -116,6 +147,9 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
   }
 
   const estagioAtual = cliente.estagio ?? "contato";
+  const dataFechamentoOriginal = cliente.dataFechamento
+    ? new Date(cliente.dataFechamento).toLocaleDateString("pt-BR")
+    : "";
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
@@ -156,6 +190,29 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
           );
         })}
       </View>
+
+      <Text style={styles.rotulo}>Data de fechamento do contrato</Text>
+      <TextInput
+        style={styles.inputData}
+        placeholder="dd/mm/aaaa"
+        keyboardType="number-pad"
+        value={dataFechamentoTexto}
+        onChangeText={(v) => setDataFechamentoTexto(maskData(v))}
+      />
+      {erroDataFechamento ? <Text style={styles.erro}>{erroDataFechamento}</Text> : null}
+      {dataFechamentoTexto !== dataFechamentoOriginal && (
+        <Pressable
+          style={styles.botaoSalvarObservacoes}
+          onPress={handleSalvarDataFechamento}
+          disabled={salvandoDataFechamento}
+        >
+          {salvandoDataFechamento ? (
+            <ActivityIndicator color={colors.surface} />
+          ) : (
+            <Text style={styles.botaoSalvarObservacoesTexto}>Salvar data de fechamento</Text>
+          )}
+        </Pressable>
+      )}
 
       <View style={styles.campo}>
         <Text style={styles.rotulo}>CNPJ</Text>
@@ -328,6 +385,17 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   valor: { fontSize: 16, fontFamily: "Prompt_400Regular", color: colors.text },
+  inputData: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 15,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+    maxWidth: 160,
+  },
+  erro: { color: colors.danger, fontFamily: "Prompt_400Regular", fontSize: 13, marginTop: 6 },
   tagsLinha: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
   tag: {
     backgroundColor: colors.accent + "22",

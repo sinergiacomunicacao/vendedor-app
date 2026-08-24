@@ -117,6 +117,7 @@ export default function RelatorioScreen({ navigation }: Props) {
         "Produtos de Interesse",
         "Valor Total",
         "Estágio",
+        "Data de Fechamento",
         "Observações",
         "Cancelado",
         "Motivo do Cancelamento",
@@ -141,6 +142,7 @@ export default function RelatorioScreen({ navigation }: Props) {
           .join("; "),
         formatarMoeda(valorTotalCliente(cliente.produtosInteresse)),
         labelEstagio(cliente.estagio ?? "contato"),
+        cliente.dataFechamento ? new Date(cliente.dataFechamento).toLocaleDateString("pt-BR") : "",
         cliente.observacoes ?? "",
         cliente.cancelado ? "Sim" : "Não",
         cliente.motivoCancelamento ?? "",
@@ -332,6 +334,11 @@ export default function RelatorioScreen({ navigation }: Props) {
                 <Text style={styles.detalhe}>
                   Cadastrado em: {new Date(item.criadoEm).toLocaleDateString("pt-BR")}
                 </Text>
+                {estagio === "fechado" && item.dataFechamento ? (
+                  <Text style={styles.detalhe}>
+                    Fechado em: {new Date(item.dataFechamento).toLocaleDateString("pt-BR")}
+                  </Text>
+                ) : null}
                 {item.cancelado && item.motivoCancelamento ? (
                   <Text style={styles.detalheMotivo}>Motivo: {item.motivoCancelamento}</Text>
                 ) : null}
