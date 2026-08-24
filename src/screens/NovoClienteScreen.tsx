@@ -20,8 +20,9 @@ import {
   ouvirEstabelecimentos,
   ouvirProdutos,
 } from "../services/estabelecimentos";
+import { ouvirPrazos } from "../services/prazos";
 import { colors } from "../theme/colors";
-import { ProdutoInteresse, normalizarProdutoInteresse } from "../types";
+import { PrazoContrato, ProdutoInteresse, labelPrazo, normalizarProdutoInteresse } from "../types";
 import { formatarMoeda, isValidCnpj, isValidEmail, maskCnpj, maskTelefone } from "../utils/format";
 
 type Props = NativeStackScreenProps<AppStackParamList, "NovoCliente">;
@@ -40,6 +41,9 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   const [estabelecimentoId, setEstabelecimentoId] = useState("");
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [quantidades, setQuantidades] = useState<Record<string, number>>({});
+  const [prazos, setPrazos] = useState<PrazoContrato[]>([]);
+  const [prazosCarregados, setPrazosCarregados] = useState(false);
+  const [prazosSelecionados, setPrazosSelecionados] = useState<Record<string, string | null>>({});
   const [observacoes, setObservacoes] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -105,6 +109,37 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
     setPrefilAplicado(true);
   }, [estabelecimentoId, estabelecimentoIdOriginal, produtosOriginais, prefilAplicado]);
 
+  useEffect(() => {
+    return ouvirPrazos((lista) => {
+      setPrazos(lista);
+      setPrazosCarregados(true);
+    });
+  }, []);
+
+  const [prefilPrazoAplicado, setPrefilPrazoAplicado] = useState(false);
+  useEffect(() => {
+    if (prefilPrazoAplicado || !produtosOriginais || !prazosCarregados) return;
+    const inicial: Record<string, string | null> = {};
+    produtosOriginais.forEach((p) => {
+      if (p.prazoMeses) {
+        const encontrado = prazos.find((pr) => pr.meses === p.prazoMeses);
+        inicial[p.id] = encontrado ? encontrado.id : null;
+      }
+    });
+    setPrazosSelecionados(inicial);
+    setPrefilPrazoAplicado(true);
+  }, [produtosOriginais, prazos, prazosCarregados, prefilPrazoAplicado]);
+
+  function selecionarPrazo(produtoId: string, prazoId: string | null) {
+    setPrazosSelecionados((atual) => ({ ...atual, [produtoId]: prazoId }));
+  }
+
+  function valorComDesconto(produto: Produto, prazoId: string | null | undefined) {
+    const prazo = prazoId ? prazos.find((p) => p.id === prazoId) : null;
+    if (!prazo) return produto.valorTabela;
+    return produto.valorTabela * (1 - prazo.descontoPercentual / 100);
+  }
+
   function disponivelParaEsteCliente(produto: Produto) {
     const original =
       estabelecimentoId === estabelecimentoIdOriginal
@@ -123,7 +158,8 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   }
 
   const valorTotal = produtos.reduce(
-    (total, p) => total + (quantidades[p.id] ?? 0) * p.valorTabela,
+    (total, p) =>
+      total + (quantidades[p.id] ?? 0) * valorComDesconto(p, prazosSelecionados[p.id]),
     0
   );
 
@@ -152,12 +188,18 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
     }
     const produtosSelecionados: ProdutoInteresse[] = produtos
       .filter((p) => (quantidades[p.id] ?? 0) > 0)
-      .map((p) => ({
-        id: p.id,
-        nome: p.nome,
-        quantidade: quantidades[p.id],
-        valorUnitario: p.valorTabela,
-      }));
+      .map((p) => {
+        const prazoId = prazosSelecionados[p.id] ?? null;
+        const prazo = prazoId ? prazos.find((pr) => pr.id === prazoId) : null;
+        return {
+          id: p.id,
+          nome: p.nome,
+          quantidade: quantidades[p.id],
+          valorUnitario: valorComDesconto(p, prazoId),
+          prazoMeses: prazo?.meses,
+          descontoPercentual: prazo?.descontoPercentual,
+        };
+      });
     if (produtosSelecionados.length === 0) {
       setErro("Selecione ao menos um produto.");
       return;
@@ -296,39 +338,89 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
               const disponivel = disponivelParaEsteCliente(produto);
               const quantidade = quantidades[produto.id] ?? 0;
               const esgotado = disponivel <= 0;
+              const prazoSelecionadoId = prazosSelecionados[produto.id] ?? null;
+              const valorFinal = valorComDesconto(produto, prazoSelecionadoId);
               return (
                 <View
                   key={produto.id}
-                  style={[styles.produtoLinha, esgotado && styles.produtoLinhaDesabilitada]}
+                  style={[styles.produtoCard, esgotado && styles.produtoLinhaDesabilitada]}
                 >
-                  <View style={styles.produtoInfo}>
-                    <Text style={styles.produtoNome}>{produto.nome}</Text>
-                    <Text style={styles.produtoDetalhe}>
-                      {formatarMoeda(produto.valorTabela)}
-                      {"  ·  "}
-                      {esgotado ? "Esgotado" : `${disponivel} disponíve${disponivel === 1 ? "l" : "is"}`}
-                    </Text>
+                  <View style={styles.produtoLinha}>
+                    <View style={styles.produtoInfo}>
+                      <Text style={styles.produtoNome}>{produto.nome}</Text>
+                      <Text style={styles.produtoDetalhe}>
+                        {formatarMoeda(produto.valorTabela)}
+                        {"  ·  "}
+                        {esgotado ? "Esgotado" : `${disponivel} disponíve${disponivel === 1 ? "l" : "is"}`}
+                      </Text>
+                    </View>
+                    <View style={styles.stepper}>
+                      <Pressable
+                        style={[styles.stepperBotao, quantidade <= 0 && styles.stepperBotaoDesabilitado]}
+                        onPress={() => alterarQuantidade(produto, -1)}
+                        disabled={quantidade <= 0}
+                      >
+                        <Text style={styles.stepperBotaoTexto}>−</Text>
+                      </Pressable>
+                      <Text style={styles.stepperValor}>{quantidade}</Text>
+                      <Pressable
+                        style={[
+                          styles.stepperBotao,
+                          quantidade >= disponivel && styles.stepperBotaoDesabilitado,
+                        ]}
+                        onPress={() => alterarQuantidade(produto, 1)}
+                        disabled={quantidade >= disponivel}
+                      >
+                        <Text style={styles.stepperBotaoTexto}>+</Text>
+                      </Pressable>
+                    </View>
                   </View>
-                  <View style={styles.stepper}>
-                    <Pressable
-                      style={[styles.stepperBotao, quantidade <= 0 && styles.stepperBotaoDesabilitado]}
-                      onPress={() => alterarQuantidade(produto, -1)}
-                      disabled={quantidade <= 0}
-                    >
-                      <Text style={styles.stepperBotaoTexto}>−</Text>
-                    </Pressable>
-                    <Text style={styles.stepperValor}>{quantidade}</Text>
-                    <Pressable
-                      style={[
-                        styles.stepperBotao,
-                        quantidade >= disponivel && styles.stepperBotaoDesabilitado,
-                      ]}
-                      onPress={() => alterarQuantidade(produto, 1)}
-                      disabled={quantidade >= disponivel}
-                    >
-                      <Text style={styles.stepperBotaoTexto}>+</Text>
-                    </Pressable>
-                  </View>
+
+                  {quantidade > 0 && prazos.length > 0 && (
+                    <View style={styles.prazoContainer}>
+                      <Text style={styles.prazoLabel}>Prazo do contrato</Text>
+                      <View style={styles.prazoOpcoes}>
+                        <Pressable
+                          style={[styles.prazoOpcao, !prazoSelecionadoId && styles.prazoOpcaoSelecionada]}
+                          onPress={() => selecionarPrazo(produto.id, null)}
+                        >
+                          <Text
+                            style={[
+                              styles.prazoOpcaoTexto,
+                              !prazoSelecionadoId && styles.prazoOpcaoTextoSelecionado,
+                            ]}
+                          >
+                            Sem prazo
+                          </Text>
+                        </Pressable>
+                        {prazos.map((prazo) => {
+                          const ativo = prazoSelecionadoId === prazo.id;
+                          return (
+                            <Pressable
+                              key={prazo.id}
+                              style={[styles.prazoOpcao, ativo && styles.prazoOpcaoSelecionada]}
+                              onPress={() => selecionarPrazo(produto.id, prazo.id)}
+                            >
+                              <Text
+                                style={[
+                                  styles.prazoOpcaoTexto,
+                                  ativo && styles.prazoOpcaoTextoSelecionado,
+                                ]}
+                              >
+                                {labelPrazo(prazo.meses)}
+                                {prazo.descontoPercentual > 0 ? ` -${prazo.descontoPercentual}%` : ""}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      {valorFinal !== produto.valorTabela && (
+                        <Text style={styles.prazoValorComDesconto}>
+                          {formatarMoeda(valorFinal)} com desconto (de {formatarMoeda(produto.valorTabela)})
+                        </Text>
+                      )}
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -424,17 +516,48 @@ const styles = StyleSheet.create({
   opcaoTextoSelecionado: { color: colors.surface, fontFamily: "Prompt_600SemiBold" },
   vazio: { color: colors.textMuted, fontFamily: "Prompt_400Regular", fontSize: 13 },
   listaProdutos: { gap: 8 },
-  produtoLinha: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  produtoCard: {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 10,
     padding: 12,
+  },
+  produtoLinha: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 10,
   },
   produtoLinhaDesabilitada: { backgroundColor: colors.background, opacity: 0.6 },
+  prazoContainer: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  prazoLabel: {
+    fontSize: 11,
+    fontFamily: "Prompt_600SemiBold",
+    color: colors.textMuted,
+    marginBottom: 6,
+  },
+  prazoOpcoes: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  prazoOpcao: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  prazoOpcaoSelecionada: { backgroundColor: colors.accent, borderColor: colors.accent },
+  prazoOpcaoTexto: { color: colors.textMuted, fontFamily: "Prompt_400Regular", fontSize: 12 },
+  prazoOpcaoTextoSelecionado: { color: colors.surface, fontFamily: "Prompt_600SemiBold" },
+  prazoValorComDesconto: {
+    fontFamily: "Prompt_600SemiBold",
+    color: colors.success,
+    fontSize: 12,
+    marginTop: 8,
+  },
   produtoInfo: { flex: 1 },
   produtoNome: { fontFamily: "Prompt_500Medium", color: colors.text, fontSize: 14 },
   produtoDetalhe: { fontFamily: "Prompt_400Regular", color: colors.textMuted, fontSize: 12, marginTop: 2 },

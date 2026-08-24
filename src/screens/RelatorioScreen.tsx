@@ -14,7 +14,14 @@ import { ouvirTodosClientes } from "../services/clientes";
 import { Estabelecimento, ouvirEstabelecimentos } from "../services/estabelecimentos";
 import { ouvirVendedores, Vendedor } from "../services/vendedores";
 import { colors } from "../theme/colors";
-import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse, valorTotalCliente } from "../types";
+import {
+  Cliente,
+  ESTAGIOS,
+  Estagio,
+  labelPrazo,
+  normalizarProdutoInteresse,
+  valorTotalCliente,
+} from "../types";
 import { exportarCsv, paraCsv } from "../utils/csv";
 import { formatarMoeda, maskData, parseData } from "../utils/format";
 
@@ -102,7 +109,13 @@ export default function RelatorioScreen({ navigation }: Props) {
         cliente.estabelecimento,
         cliente.produtosInteresse
           .map(normalizarProdutoInteresse)
-          .map((p) => (p.quantidade > 1 ? `${p.nome} ×${p.quantidade}` : p.nome))
+          .map((p) => {
+            const qtd = p.quantidade > 1 ? ` ×${p.quantidade}` : "";
+            const prazo = p.prazoMeses
+              ? ` (${labelPrazo(p.prazoMeses)}${p.descontoPercentual ? `, -${p.descontoPercentual}%` : ""})`
+              : "";
+            return `${p.nome}${qtd}${prazo}`;
+          })
           .join("; "),
         formatarMoeda(valorTotalCliente(cliente.produtosInteresse)),
         labelEstagio(cliente.estagio ?? "contato"),

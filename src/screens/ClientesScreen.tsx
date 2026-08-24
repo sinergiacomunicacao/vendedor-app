@@ -118,6 +118,11 @@ export default function ClientesScreen({ navigation }: Props) {
               <Text style={styles.link}>Estabelecimentos</Text>
             </Pressable>
           )}
+          {gestor && (
+            <Pressable onPress={() => navigation.navigate("PrazosContrato")}>
+              <Text style={styles.link}>Prazos</Text>
+            </Pressable>
+          )}
           <Pressable onPress={sair}>
             <Text style={styles.sair}>Sair</Text>
           </Pressable>

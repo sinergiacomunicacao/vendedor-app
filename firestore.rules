@@ -25,6 +25,11 @@ service cloud.firestore {
         && request.resource.data.papel == resource.data.papel;
     }
 
+    match /prazosContrato/{prazoId} {
+      allow read: if request.auth != null;
+      allow write: if isGestor();
+    }
+
     match /estabelecimentos/{estabelecimentoId} {
       allow read: if request.auth != null;
       allow write: if isGestor();

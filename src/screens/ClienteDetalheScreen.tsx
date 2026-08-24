@@ -15,7 +15,14 @@ import { AppStackParamList } from "../navigation/types";
 import { db } from "../services/firebase";
 import { atualizarEstagioCliente, atualizarObservacoesCliente, cancelarCliente } from "../services/clientes";
 import { colors } from "../theme/colors";
-import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse, valorTotalCliente } from "../types";
+import {
+  Cliente,
+  ESTAGIOS,
+  Estagio,
+  labelPrazo,
+  normalizarProdutoInteresse,
+  valorTotalCliente,
+} from "../types";
 import { showAlert } from "../utils/alert";
 import { formatarMoeda } from "../utils/format";
 
@@ -175,14 +182,22 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
       <Text style={styles.rotulo}>Produtos de interesse</Text>
       <View style={styles.listaProdutos}>
         {cliente.produtosInteresse.map(normalizarProdutoInteresse).map((produto) => (
-          <View key={produto.id} style={styles.produtoLinha}>
-            <Text style={styles.produtoNome}>
-              {produto.nome}
-              {produto.quantidade > 1 ? `  ×${produto.quantidade}` : ""}
-            </Text>
-            <Text style={styles.produtoValor}>
-              {formatarMoeda(produto.valorUnitario * produto.quantidade)}
-            </Text>
+          <View key={produto.id} style={styles.produtoCard}>
+            <View style={styles.produtoLinha}>
+              <Text style={styles.produtoNome}>
+                {produto.nome}
+                {produto.quantidade > 1 ? `  ×${produto.quantidade}` : ""}
+              </Text>
+              <Text style={styles.produtoValor}>
+                {formatarMoeda(produto.valorUnitario * produto.quantidade)}
+              </Text>
+            </View>
+            {produto.prazoMeses ? (
+              <Text style={styles.produtoPrazo}>
+                {labelPrazo(produto.prazoMeses)}
+                {produto.descontoPercentual ? ` · ${produto.descontoPercentual}% de desconto` : ""}
+              </Text>
+            ) : null}
           </View>
         ))}
       </View>
@@ -324,17 +339,25 @@ const styles = StyleSheet.create({
   tagEstabelecimento: { backgroundColor: colors.warning + "33" },
   tagTextoEstabelecimento: { color: colors.primary },
   listaProdutos: { gap: 6, marginBottom: 8 },
-  produtoLinha: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  produtoCard: {
     backgroundColor: colors.accent + "11",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  produtoLinha: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   produtoNome: { color: colors.text, fontSize: 14, fontFamily: "Prompt_500Medium" },
   produtoValor: { color: colors.textMuted, fontSize: 13, fontFamily: "Prompt_400Regular" },
+  produtoPrazo: {
+    color: colors.success,
+    fontSize: 12,
+    fontFamily: "Prompt_400Regular",
+    marginTop: 4,
+  },
   totalLinha: {
     flexDirection: "row",
     justifyContent: "space-between",
