@@ -22,7 +22,7 @@ import {
   normalizarProdutoInteresse,
   valorTotalCliente,
 } from "../types";
-import { exportarCsv, paraCsv } from "../utils/csv";
+import { exportarPlanilha } from "../utils/planilha";
 import { formatarMoeda, maskData, parseData } from "../utils/format";
 
 type Props = NativeStackScreenProps<AppStackParamList, "Relatorio">;
@@ -46,9 +46,15 @@ export default function RelatorioScreen({ navigation }: Props) {
 
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
-  const [vendedorId, setVendedorId] = useState<string | null>(null);
-  const [estabelecimentoNome, setEstabelecimentoNome] = useState<string | null>(null);
+  const [vendedorIds, setVendedorIds] = useState<string[]>([]);
+  const [estabelecimentoNomes, setEstabelecimentoNomes] = useState<string[]>([]);
+  const [clienteIds, setClienteIds] = useState<string[]>([]);
+  const [buscaCliente, setBuscaCliente] = useState("");
   const [exportando, setExportando] = useState(false);
+
+  function alternarNaLista<T>(lista: T[], valor: T, setLista: (l: T[]) => void) {
+    setLista(lista.includes(valor) ? lista.filter((v) => v !== valor) : [...lista, valor]);
+  }
 
   useEffect(() => {
     const unsub = ouvirTodosClientes((lista) => {
@@ -70,13 +76,29 @@ export default function RelatorioScreen({ navigation }: Props) {
     const inicio = parseData(dataInicio, false);
     const fim = parseData(dataFim, true);
     return clientes.filter((cliente) => {
-      if (vendedorId && cliente.vendedorId !== vendedorId) return false;
-      if (estabelecimentoNome && cliente.estabelecimento !== estabelecimentoNome) return false;
+      if (vendedorIds.length > 0 && !vendedorIds.includes(cliente.vendedorId)) return false;
+      if (estabelecimentoNomes.length > 0 && !estabelecimentoNomes.includes(cliente.estabelecimento))
+        return false;
+      if (clienteIds.length > 0 && !clienteIds.includes(cliente.id)) return false;
       if (inicio !== null && cliente.criadoEm < inicio) return false;
       if (fim !== null && cliente.criadoEm > fim) return false;
       return true;
     });
-  }, [clientes, vendedorId, estabelecimentoNome, dataInicio, dataFim]);
+  }, [clientes, vendedorIds, estabelecimentoNomes, clienteIds, dataInicio, dataFim]);
+
+  const clientesEncontrados = useMemo(() => {
+    const termo = buscaCliente.trim().toLowerCase();
+    if (!termo) return [];
+    return clientes
+      .filter((c) => c.razaoSocial.toLowerCase().includes(termo))
+      .sort((a, b) => a.razaoSocial.localeCompare(b.razaoSocial))
+      .slice(0, 20);
+  }, [clientes, buscaCliente]);
+
+  const clientesSelecionados = useMemo(
+    () => clientes.filter((c) => clienteIds.includes(c.id)),
+    [clientes, clienteIds]
+  );
 
   const valorTotalFiltrado = useMemo(
     () => clientesFiltrados.reduce((total, c) => total + valorTotalCliente(c.produtosInteresse), 0),
@@ -125,8 +147,7 @@ export default function RelatorioScreen({ navigation }: Props) {
         nomeVendedor(cliente.vendedorId),
         new Date(cliente.criadoEm).toLocaleDateString("pt-BR"),
       ]);
-      const csv = paraCsv(colunas, linhas);
-      await exportarCsv("clientes.csv", csv);
+      await exportarPlanilha("clientes.xlsx", colunas, linhas);
     } finally {
       setExportando(false);
     }
@@ -153,58 +174,109 @@ export default function RelatorioScreen({ navigation }: Props) {
           />
         </View>
 
-        <Text style={styles.label}>Vendedor</Text>
+        <Text style={styles.label}>
+          Vendedor{vendedorIds.length > 0 ? ` (${vendedorIds.length})` : ""}
+        </Text>
         <View style={styles.opcoes}>
           <Pressable
-            style={[styles.opcao, vendedorId === null && styles.opcaoSelecionada]}
-            onPress={() => setVendedorId(null)}
-          >
-            <Text style={[styles.opcaoTexto, vendedorId === null && styles.opcaoTextoSelecionado]}>
-              Todos
-            </Text>
-          </Pressable>
-          {vendedores.map((v) => (
-            <Pressable
-              key={v.id}
-              style={[styles.opcao, vendedorId === v.id && styles.opcaoSelecionada]}
-              onPress={() => setVendedorId(v.id)}
-            >
-              <Text style={[styles.opcaoTexto, vendedorId === v.id && styles.opcaoTextoSelecionado]}>
-                {v.nome}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={styles.label}>Estabelecimento</Text>
-        <View style={styles.opcoes}>
-          <Pressable
-            style={[styles.opcao, estabelecimentoNome === null && styles.opcaoSelecionada]}
-            onPress={() => setEstabelecimentoNome(null)}
+            style={[styles.opcao, vendedorIds.length === 0 && styles.opcaoSelecionada]}
+            onPress={() => setVendedorIds([])}
           >
             <Text
-              style={[styles.opcaoTexto, estabelecimentoNome === null && styles.opcaoTextoSelecionado]}
+              style={[styles.opcaoTexto, vendedorIds.length === 0 && styles.opcaoTextoSelecionado]}
             >
               Todos
             </Text>
           </Pressable>
-          {estabelecimentos.map((e) => (
-            <Pressable
-              key={e.id}
-              style={[styles.opcao, estabelecimentoNome === e.nome && styles.opcaoSelecionada]}
-              onPress={() => setEstabelecimentoNome(e.nome)}
-            >
-              <Text
-                style={[
-                  styles.opcaoTexto,
-                  estabelecimentoNome === e.nome && styles.opcaoTextoSelecionado,
-                ]}
+          {vendedores.map((v) => {
+            const ativo = vendedorIds.includes(v.id);
+            return (
+              <Pressable
+                key={v.id}
+                style={[styles.opcao, ativo && styles.opcaoSelecionada]}
+                onPress={() => alternarNaLista(vendedorIds, v.id, setVendedorIds)}
               >
-                {e.nome}
-              </Text>
-            </Pressable>
-          ))}
+                <Text style={[styles.opcaoTexto, ativo && styles.opcaoTextoSelecionado]}>
+                  {v.nome}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
+
+        <Text style={styles.label}>
+          Estabelecimento{estabelecimentoNomes.length > 0 ? ` (${estabelecimentoNomes.length})` : ""}
+        </Text>
+        <View style={styles.opcoes}>
+          <Pressable
+            style={[styles.opcao, estabelecimentoNomes.length === 0 && styles.opcaoSelecionada]}
+            onPress={() => setEstabelecimentoNomes([])}
+          >
+            <Text
+              style={[
+                styles.opcaoTexto,
+                estabelecimentoNomes.length === 0 && styles.opcaoTextoSelecionado,
+              ]}
+            >
+              Todos
+            </Text>
+          </Pressable>
+          {estabelecimentos.map((e) => {
+            const ativo = estabelecimentoNomes.includes(e.nome);
+            return (
+              <Pressable
+                key={e.id}
+                style={[styles.opcao, ativo && styles.opcaoSelecionada]}
+                onPress={() => alternarNaLista(estabelecimentoNomes, e.nome, setEstabelecimentoNomes)}
+              >
+                <Text style={[styles.opcaoTexto, ativo && styles.opcaoTextoSelecionado]}>
+                  {e.nome}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.label}>
+          Cliente{clienteIds.length > 0 ? ` (${clienteIds.length})` : ""}
+        </Text>
+        {clientesSelecionados.length > 0 && (
+          <View style={styles.opcoes}>
+            {clientesSelecionados.map((c) => (
+              <Pressable
+                key={c.id}
+                style={[styles.opcao, styles.opcaoSelecionada]}
+                onPress={() => alternarNaLista(clienteIds, c.id, setClienteIds)}
+              >
+                <Text style={styles.opcaoTextoSelecionado}>{c.razaoSocial} ×</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+        <TextInput
+          style={styles.inputBuscaCliente}
+          placeholder="Buscar cliente por nome para adicionar"
+          value={buscaCliente}
+          onChangeText={setBuscaCliente}
+        />
+        {clientesEncontrados.length > 0 && (
+          <View style={styles.opcoes}>
+            {clientesEncontrados.map((c) => {
+              const ativo = clienteIds.includes(c.id);
+              return (
+                <Pressable
+                  key={c.id}
+                  style={[styles.opcao, ativo && styles.opcaoSelecionada]}
+                  onPress={() => alternarNaLista(clienteIds, c.id, setClienteIds)}
+                >
+                  <Text style={[styles.opcaoTexto, ativo && styles.opcaoTextoSelecionado]}>
+                    {c.razaoSocial}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         <View style={styles.totalFiltroLinha}>
           <Text style={styles.totalFiltroLabel}>
@@ -218,7 +290,7 @@ export default function RelatorioScreen({ navigation }: Props) {
             <ActivityIndicator color={colors.surface} />
           ) : (
             <Text style={styles.botaoExportarTexto}>
-              Exportar CSV ({clientesFiltrados.length})
+              Exportar planilha ({clientesFiltrados.length})
             </Text>
           )}
         </Pressable>
@@ -304,6 +376,17 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   opcoes: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  inputBuscaCliente: {
+    borderWidth: 1,
+    minWidth: 0,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 14,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+    marginBottom: 8,
+  },
   opcao: {
     borderWidth: 1,
     borderColor: colors.border,
