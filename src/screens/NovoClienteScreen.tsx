@@ -22,10 +22,14 @@ import {
 } from "../services/estabelecimentos";
 import { ouvirPrazos } from "../services/prazos";
 import { colors } from "../theme/colors";
-import { PrazoContrato, ProdutoInteresse, labelPrazo, normalizarProdutoInteresse } from "../types";
+import { PrazoContrato, ProdutoInteresse, labelPrazo, produtoComEstabelecimento } from "../types";
 import { formatarMoeda, isValidCnpj, isValidEmail, maskCnpj, maskTelefone } from "../utils/format";
 
 type Props = NativeStackScreenProps<AppStackParamList, "NovoCliente">;
+
+function chave(estabelecimentoId: string, produtoId: string) {
+  return `${estabelecimentoId}::${produtoId}`;
+}
 
 export default function NovoClienteScreen({ navigation, route }: Props) {
   const { user } = useAuth();
@@ -38,8 +42,8 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
   const [estabelecimentos, setEstabelecimentos] = useState<Estabelecimento[]>([]);
-  const [estabelecimentoId, setEstabelecimentoId] = useState("");
-  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [estabelecimentoIds, setEstabelecimentoIds] = useState<string[]>([]);
+  const [produtosPorEstab, setProdutosPorEstab] = useState<Record<string, Produto[]>>({});
   const [quantidades, setQuantidades] = useState<Record<string, number>>({});
   const [prazos, setPrazos] = useState<PrazoContrato[]>([]);
   const [prazosCarregados, setPrazosCarregados] = useState(false);
@@ -48,10 +52,6 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
-  const [estabelecimentoNomeOriginal, setEstabelecimentoNomeOriginal] = useState<string | null>(
-    null
-  );
-  const [estabelecimentoIdOriginal, setEstabelecimentoIdOriginal] = useState<string | null>(null);
   const [produtosOriginais, setProdutosOriginais] = useState<ProdutoInteresse[] | null>(null);
 
   useEffect(() => {
@@ -67,47 +67,39 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       setTelefone(cliente.telefone);
       setEmail(cliente.email);
       setObservacoes(cliente.observacoes ?? "");
-      setEstabelecimentoNomeOriginal(cliente.estabelecimento);
-      setEstabelecimentoIdOriginal(cliente.estabelecimentoId || null);
-      setProdutosOriginais(cliente.produtosInteresse.map(normalizarProdutoInteresse));
+      setProdutosOriginais(
+        cliente.produtosInteresse.map((item) => produtoComEstabelecimento(item, cliente))
+      );
       setCarregandoCliente(false);
     });
   }, [clienteId]);
 
-  useEffect(() => {
-    return ouvirEstabelecimentos((lista) => {
-      setEstabelecimentos(lista);
-      setEstabelecimentoId((atual) => {
-        if (atual) return atual;
-        if (estabelecimentoIdOriginal) return estabelecimentoIdOriginal;
-        if (estabelecimentoNomeOriginal) {
-          const encontrado = lista.find((e) => e.nome === estabelecimentoNomeOriginal);
-          if (encontrado) return encontrado.id;
-        }
-        return modoEdicao ? "" : lista[0]?.id || "";
-      });
-    });
-  }, [estabelecimentoNomeOriginal, estabelecimentoIdOriginal, modoEdicao]);
+  useEffect(() => ouvirEstabelecimentos(setEstabelecimentos), []);
 
   useEffect(() => {
-    setProdutos([]);
-    setQuantidades({});
-    if (!estabelecimentoId) return;
-    return ouvirProdutos(estabelecimentoId, setProdutos);
-  }, [estabelecimentoId]);
+    const unsubs = estabelecimentoIds.map((id) =>
+      ouvirProdutos(id, (produtos) => {
+        setProdutosPorEstab((atual) => ({ ...atual, [id]: produtos }));
+      })
+    );
+    return () => unsubs.forEach((unsub) => unsub());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estabelecimentoIds.join(",")]);
 
   const [prefilAplicado, setPrefilAplicado] = useState(false);
   useEffect(() => {
-    if (prefilAplicado || !produtosOriginais || !estabelecimentoId) return;
-    if (estabelecimentoId === estabelecimentoIdOriginal) {
-      const inicial: Record<string, number> = {};
-      produtosOriginais.forEach((p) => {
-        inicial[p.id] = p.quantidade;
-      });
-      setQuantidades(inicial);
-    }
+    if (prefilAplicado || !produtosOriginais) return;
+    const idsIniciais = Array.from(
+      new Set(produtosOriginais.map((p) => p.estabelecimentoId).filter((id): id is string => Boolean(id)))
+    );
+    setEstabelecimentoIds(idsIniciais);
+    const qtds: Record<string, number> = {};
+    produtosOriginais.forEach((p) => {
+      qtds[chave(p.estabelecimentoId || "", p.id)] = p.quantidade;
+    });
+    setQuantidades(qtds);
     setPrefilAplicado(true);
-  }, [estabelecimentoId, estabelecimentoIdOriginal, produtosOriginais, prefilAplicado]);
+  }, [produtosOriginais, prefilAplicado]);
 
   useEffect(() => {
     return ouvirPrazos((lista) => {
@@ -123,15 +115,21 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
     produtosOriginais.forEach((p) => {
       if (p.prazoMeses) {
         const encontrado = prazos.find((pr) => pr.meses === p.prazoMeses);
-        inicial[p.id] = encontrado ? encontrado.id : null;
+        inicial[chave(p.estabelecimentoId || "", p.id)] = encontrado ? encontrado.id : null;
       }
     });
     setPrazosSelecionados(inicial);
     setPrefilPrazoAplicado(true);
   }, [produtosOriginais, prazos, prazosCarregados, prefilPrazoAplicado]);
 
-  function selecionarPrazo(produtoId: string, prazoId: string | null) {
-    setPrazosSelecionados((atual) => ({ ...atual, [produtoId]: prazoId }));
+  function alternarEstabelecimento(id: string) {
+    setEstabelecimentoIds((atual) =>
+      atual.includes(id) ? atual.filter((v) => v !== id) : [...atual, id]
+    );
+  }
+
+  function selecionarPrazo(estabelecimentoId: string, produtoId: string, prazoId: string | null) {
+    setPrazosSelecionados((atual) => ({ ...atual, [chave(estabelecimentoId, produtoId)]: prazoId }));
   }
 
   function valorComDesconto(produto: Produto, prazoId: string | null | undefined) {
@@ -140,28 +138,33 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
     return produto.valorTabela * (1 - prazo.descontoPercentual / 100);
   }
 
-  function disponivelParaEsteCliente(produto: Produto) {
+  function disponivelParaEsteCliente(estabelecimentoId: string, produto: Produto) {
     const original =
-      estabelecimentoId === estabelecimentoIdOriginal
-        ? produtosOriginais?.find((p) => p.id === produto.id)?.quantidade ?? 0
-        : 0;
+      produtosOriginais?.find((p) => p.estabelecimentoId === estabelecimentoId && p.id === produto.id)
+        ?.quantidade ?? 0;
     return produto.estoque + original;
   }
 
-  function alterarQuantidade(produto: Produto, delta: number) {
-    const disponivel = disponivelParaEsteCliente(produto);
+  function alterarQuantidade(estabelecimentoId: string, produto: Produto, delta: number) {
+    const disponivel = disponivelParaEsteCliente(estabelecimentoId, produto);
+    const k = chave(estabelecimentoId, produto.id);
     setQuantidades((atual) => {
-      const atualQtd = atual[produto.id] ?? 0;
+      const atualQtd = atual[k] ?? 0;
       const novaQtd = Math.max(0, Math.min(disponivel, atualQtd + delta));
-      return { ...atual, [produto.id]: novaQtd };
+      return { ...atual, [k]: novaQtd };
     });
   }
 
-  const valorTotal = produtos.reduce(
-    (total, p) =>
-      total + (quantidades[p.id] ?? 0) * valorComDesconto(p, prazosSelecionados[p.id]),
-    0
-  );
+  const valorTotal = estabelecimentoIds.reduce((totalGeral, estId) => {
+    const produtosDoEst = produtosPorEstab[estId] ?? [];
+    return (
+      totalGeral +
+      produtosDoEst.reduce((total, p) => {
+        const k = chave(estId, p.id);
+        return total + (quantidades[k] ?? 0) * valorComDesconto(p, prazosSelecionados[k]);
+      }, 0)
+    );
+  }, 0);
 
   async function handleSalvar() {
     setErro("");
@@ -181,24 +184,30 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       setErro("Informe um email válido.");
       return;
     }
-    const estabelecimento = estabelecimentos.find((e) => e.id === estabelecimentoId);
-    if (!estabelecimento) {
-      setErro("Selecione um estabelecimento.");
+    if (estabelecimentoIds.length === 0) {
+      setErro("Selecione ao menos um estabelecimento.");
       return;
     }
-    const produtosSelecionados: ProdutoInteresse[] = produtos
-      .filter((p) => (quantidades[p.id] ?? 0) > 0)
-      .map((p) => {
-        const prazoId = prazosSelecionados[p.id] ?? null;
-        const prazo = prazoId ? prazos.find((pr) => pr.id === prazoId) : null;
-        return {
-          id: p.id,
-          nome: p.nome,
-          quantidade: quantidades[p.id],
-          valorUnitario: valorComDesconto(p, prazoId),
-          ...(prazo ? { prazoMeses: prazo.meses, descontoPercentual: prazo.descontoPercentual } : {}),
-        };
-      });
+
+    const produtosSelecionados: ProdutoInteresse[] = estabelecimentoIds.flatMap((estId) => {
+      const nomeEstabelecimento = estabelecimentos.find((e) => e.id === estId)?.nome ?? "";
+      return (produtosPorEstab[estId] ?? [])
+        .filter((p) => (quantidades[chave(estId, p.id)] ?? 0) > 0)
+        .map((p) => {
+          const k = chave(estId, p.id);
+          const prazoId = prazosSelecionados[k] ?? null;
+          const prazo = prazoId ? prazos.find((pr) => pr.id === prazoId) : null;
+          return {
+            id: p.id,
+            nome: p.nome,
+            quantidade: quantidades[k],
+            valorUnitario: valorComDesconto(p, prazoId),
+            estabelecimentoId: estId,
+            estabelecimentoNome: nomeEstabelecimento,
+            ...(prazo ? { prazoMeses: prazo.meses, descontoPercentual: prazo.descontoPercentual } : {}),
+          };
+        });
+    });
     if (produtosSelecionados.length === 0) {
       setErro("Selecione ao menos um produto.");
       return;
@@ -211,8 +220,6 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       razaoSocial: razaoSocial.trim(),
       telefone,
       email: email.trim(),
-      estabelecimento: estabelecimento.nome,
-      estabelecimentoId: estabelecimento.id,
       produtosSelecionados,
       observacoes,
     };
@@ -220,14 +227,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
     setSalvando(true);
     try {
       if (clienteId) {
-        await atualizarCliente(
-          clienteId,
-          dados,
-          produtosOriginais && estabelecimentoIdOriginal === estabelecimentoId
-            ? produtosOriginais
-            : [],
-          estabelecimentoIdOriginal ?? estabelecimentoId
-        );
+        await atualizarCliente(clienteId, dados, produtosOriginais ?? []);
       } else {
         await criarCliente(dados);
       }
@@ -298,133 +298,147 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
           onChangeText={setEmail}
         />
 
-        <Text style={styles.label}>Estabelecimento</Text>
+        <Text style={styles.label}>
+          Estabelecimento{estabelecimentoIds.length > 0 ? ` (${estabelecimentoIds.length})` : ""}
+        </Text>
+        <Text style={styles.ajuda}>
+          Pode escolher mais de um, se o cliente tiver interesse em anunciar em vários lugares.
+        </Text>
         {estabelecimentos.length === 0 ? (
           <Text style={styles.vazio}>Nenhum estabelecimento cadastrado ainda.</Text>
         ) : (
           <View style={styles.opcoes}>
-            {estabelecimentos.map((local) => (
-              <Pressable
-                key={local.id}
-                style={[
-                  styles.opcao,
-                  estabelecimentoId === local.id && styles.opcaoSelecionada,
-                ]}
-                onPress={() => setEstabelecimentoId(local.id)}
-              >
-                <Text
-                  style={[
-                    styles.opcaoTexto,
-                    estabelecimentoId === local.id && styles.opcaoTextoSelecionado,
-                  ]}
-                >
-                  {local.nome}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-
-        <Text style={styles.label}>Produtos de interesse</Text>
-        <Text style={styles.ajuda}>Use os botões para escolher a quantidade de cada produto.</Text>
-        {estabelecimentoId && produtos.length === 0 ? (
-          <Text style={styles.vazio}>
-            Nenhum produto cadastrado para esse estabelecimento ainda.
-          </Text>
-        ) : (
-          <View style={styles.listaProdutos}>
-            {produtos.map((produto) => {
-              const disponivel = disponivelParaEsteCliente(produto);
-              const quantidade = quantidades[produto.id] ?? 0;
-              const esgotado = disponivel <= 0;
-              const prazoSelecionadoId = prazosSelecionados[produto.id] ?? null;
-              const valorFinal = valorComDesconto(produto, prazoSelecionadoId);
+            {estabelecimentos.map((local) => {
+              const ativo = estabelecimentoIds.includes(local.id);
               return (
-                <View
-                  key={produto.id}
-                  style={[styles.produtoCard, esgotado && styles.produtoLinhaDesabilitada]}
+                <Pressable
+                  key={local.id}
+                  style={[styles.opcao, ativo && styles.opcaoSelecionada]}
+                  onPress={() => alternarEstabelecimento(local.id)}
                 >
-                  <View style={styles.produtoLinha}>
-                    <View style={styles.produtoInfo}>
-                      <Text style={styles.produtoNome}>{produto.nome}</Text>
-                      <Text style={styles.produtoDetalhe}>
-                        {formatarMoeda(produto.valorTabela)}
-                        {"  ·  "}
-                        {esgotado ? "Esgotado" : `${disponivel} disponíve${disponivel === 1 ? "l" : "is"}`}
-                      </Text>
-                    </View>
-                    <View style={styles.stepper}>
-                      <Pressable
-                        style={[styles.stepperBotao, quantidade <= 0 && styles.stepperBotaoDesabilitado]}
-                        onPress={() => alterarQuantidade(produto, -1)}
-                        disabled={quantidade <= 0}
-                      >
-                        <Text style={styles.stepperBotaoTexto}>−</Text>
-                      </Pressable>
-                      <Text style={styles.stepperValor}>{quantidade}</Text>
-                      <Pressable
-                        style={[
-                          styles.stepperBotao,
-                          quantidade >= disponivel && styles.stepperBotaoDesabilitado,
-                        ]}
-                        onPress={() => alterarQuantidade(produto, 1)}
-                        disabled={quantidade >= disponivel}
-                      >
-                        <Text style={styles.stepperBotaoTexto}>+</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-
-                  {quantidade > 0 && prazos.length > 0 && (
-                    <View style={styles.prazoContainer}>
-                      <Text style={styles.prazoLabel}>Prazo do contrato</Text>
-                      <View style={styles.prazoOpcoes}>
-                        <Pressable
-                          style={[styles.prazoOpcao, !prazoSelecionadoId && styles.prazoOpcaoSelecionada]}
-                          onPress={() => selecionarPrazo(produto.id, null)}
-                        >
-                          <Text
-                            style={[
-                              styles.prazoOpcaoTexto,
-                              !prazoSelecionadoId && styles.prazoOpcaoTextoSelecionado,
-                            ]}
-                          >
-                            Sem prazo
-                          </Text>
-                        </Pressable>
-                        {prazos.map((prazo) => {
-                          const ativo = prazoSelecionadoId === prazo.id;
-                          return (
-                            <Pressable
-                              key={prazo.id}
-                              style={[styles.prazoOpcao, ativo && styles.prazoOpcaoSelecionada]}
-                              onPress={() => selecionarPrazo(produto.id, prazo.id)}
-                            >
-                              <Text
-                                style={[
-                                  styles.prazoOpcaoTexto,
-                                  ativo && styles.prazoOpcaoTextoSelecionado,
-                                ]}
-                              >
-                                {labelPrazo(prazo.meses)}
-                                {prazo.descontoPercentual > 0 ? ` -${prazo.descontoPercentual}%` : ""}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                      {valorFinal !== produto.valorTabela && (
-                        <Text style={styles.prazoValorComDesconto}>
-                          {formatarMoeda(valorFinal)} com desconto (de {formatarMoeda(produto.valorTabela)})
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                </View>
+                  <Text style={[styles.opcaoTexto, ativo && styles.opcaoTextoSelecionado]}>
+                    {local.nome}
+                  </Text>
+                </Pressable>
               );
             })}
           </View>
         )}
+
+        {estabelecimentoIds.map((estId) => {
+          const nomeEstabelecimento = estabelecimentos.find((e) => e.id === estId)?.nome ?? "";
+          const produtosDoEst = produtosPorEstab[estId];
+          return (
+            <View key={estId} style={styles.blocoEstabelecimento}>
+              <Text style={styles.label}>Produtos em {nomeEstabelecimento}</Text>
+              {produtosDoEst && produtosDoEst.length === 0 ? (
+                <Text style={styles.vazio}>Nenhum produto cadastrado para esse estabelecimento ainda.</Text>
+              ) : (
+                <View style={styles.listaProdutos}>
+                  {(produtosDoEst ?? []).map((produto) => {
+                    const disponivel = disponivelParaEsteCliente(estId, produto);
+                    const k = chave(estId, produto.id);
+                    const quantidade = quantidades[k] ?? 0;
+                    const esgotado = disponivel <= 0;
+                    const prazoSelecionadoId = prazosSelecionados[k] ?? null;
+                    const valorFinal = valorComDesconto(produto, prazoSelecionadoId);
+                    return (
+                      <View
+                        key={produto.id}
+                        style={[styles.produtoCard, esgotado && styles.produtoLinhaDesabilitada]}
+                      >
+                        <View style={styles.produtoLinha}>
+                          <View style={styles.produtoInfo}>
+                            <Text style={styles.produtoNome}>{produto.nome}</Text>
+                            <Text style={styles.produtoDetalhe}>
+                              {formatarMoeda(produto.valorTabela)}
+                              {"  ·  "}
+                              {esgotado
+                                ? "Esgotado"
+                                : `${disponivel} disponíve${disponivel === 1 ? "l" : "is"}`}
+                            </Text>
+                          </View>
+                          <View style={styles.stepper}>
+                            <Pressable
+                              style={[
+                                styles.stepperBotao,
+                                quantidade <= 0 && styles.stepperBotaoDesabilitado,
+                              ]}
+                              onPress={() => alterarQuantidade(estId, produto, -1)}
+                              disabled={quantidade <= 0}
+                            >
+                              <Text style={styles.stepperBotaoTexto}>−</Text>
+                            </Pressable>
+                            <Text style={styles.stepperValor}>{quantidade}</Text>
+                            <Pressable
+                              style={[
+                                styles.stepperBotao,
+                                quantidade >= disponivel && styles.stepperBotaoDesabilitado,
+                              ]}
+                              onPress={() => alterarQuantidade(estId, produto, 1)}
+                              disabled={quantidade >= disponivel}
+                            >
+                              <Text style={styles.stepperBotaoTexto}>+</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+
+                        {quantidade > 0 && prazos.length > 0 && (
+                          <View style={styles.prazoContainer}>
+                            <Text style={styles.prazoLabel}>Prazo do contrato</Text>
+                            <View style={styles.prazoOpcoes}>
+                              <Pressable
+                                style={[
+                                  styles.prazoOpcao,
+                                  !prazoSelecionadoId && styles.prazoOpcaoSelecionada,
+                                ]}
+                                onPress={() => selecionarPrazo(estId, produto.id, null)}
+                              >
+                                <Text
+                                  style={[
+                                    styles.prazoOpcaoTexto,
+                                    !prazoSelecionadoId && styles.prazoOpcaoTextoSelecionado,
+                                  ]}
+                                >
+                                  Sem prazo
+                                </Text>
+                              </Pressable>
+                              {prazos.map((prazo) => {
+                                const ativo = prazoSelecionadoId === prazo.id;
+                                return (
+                                  <Pressable
+                                    key={prazo.id}
+                                    style={[styles.prazoOpcao, ativo && styles.prazoOpcaoSelecionada]}
+                                    onPress={() => selecionarPrazo(estId, produto.id, prazo.id)}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.prazoOpcaoTexto,
+                                        ativo && styles.prazoOpcaoTextoSelecionado,
+                                      ]}
+                                    >
+                                      {labelPrazo(prazo.meses)}
+                                      {prazo.descontoPercentual > 0 ? ` -${prazo.descontoPercentual}%` : ""}
+                                    </Text>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                            {valorFinal !== produto.valorTabela && (
+                              <Text style={styles.prazoValorComDesconto}>
+                                {formatarMoeda(valorFinal)} com desconto (de {formatarMoeda(produto.valorTabela)})
+                              </Text>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          );
+        })}
 
         <Text style={styles.label}>Observações</Text>
         <TextInput
@@ -514,6 +528,12 @@ const styles = StyleSheet.create({
   opcaoTexto: { color: colors.textMuted, fontFamily: "Prompt_400Regular" },
   opcaoTextoSelecionado: { color: colors.surface, fontFamily: "Prompt_600SemiBold" },
   vazio: { color: colors.textMuted, fontFamily: "Prompt_400Regular", fontSize: 13 },
+  blocoEstabelecimento: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
   listaProdutos: { gap: 8 },
   produtoCard: {
     borderWidth: 1,

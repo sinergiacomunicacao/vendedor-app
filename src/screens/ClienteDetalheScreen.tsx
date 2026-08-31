@@ -24,8 +24,9 @@ import {
   Cliente,
   ESTAGIOS,
   Estagio,
+  estabelecimentosDoCliente,
   labelPrazo,
-  normalizarProdutoInteresse,
+  produtosPorEstabelecimento,
   valorTotalCliente,
 } from "../types";
 import { showAlert } from "../utils/alert";
@@ -227,37 +228,46 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
         <Text style={styles.valor}>{cliente.email}</Text>
       </View>
 
-      <Text style={styles.rotulo}>Estabelecimento</Text>
+      <Text style={styles.rotulo}>
+        Estabelecimento{estabelecimentosDoCliente(cliente).length > 1 ? "s" : ""}
+      </Text>
       <View style={styles.tagsLinha}>
-        <View style={[styles.tag, styles.tagEstabelecimento]}>
-          <Text style={[styles.tagTexto, styles.tagTextoEstabelecimento]}>
-            {cliente.estabelecimento}
-          </Text>
-        </View>
-      </View>
-
-      <Text style={styles.rotulo}>Produtos de interesse</Text>
-      <View style={styles.listaProdutos}>
-        {cliente.produtosInteresse.map(normalizarProdutoInteresse).map((produto) => (
-          <View key={produto.id} style={styles.produtoCard}>
-            <View style={styles.produtoLinha}>
-              <Text style={styles.produtoNome}>
-                {produto.nome}
-                {produto.quantidade > 1 ? `  ×${produto.quantidade}` : ""}
-              </Text>
-              <Text style={styles.produtoValor}>
-                {formatarMoeda(produto.valorUnitario * produto.quantidade)}
-              </Text>
-            </View>
-            {produto.prazoMeses ? (
-              <Text style={styles.produtoPrazo}>
-                {labelPrazo(produto.prazoMeses)}
-                {produto.descontoPercentual ? ` · ${produto.descontoPercentual}% de desconto` : ""}
-              </Text>
-            ) : null}
+        {estabelecimentosDoCliente(cliente).map((est) => (
+          <View key={est.id} style={[styles.tag, styles.tagEstabelecimento]}>
+            <Text style={[styles.tagTexto, styles.tagTextoEstabelecimento]}>{est.nome}</Text>
           </View>
         ))}
       </View>
+
+      <Text style={styles.rotulo}>Produtos de interesse</Text>
+      {produtosPorEstabelecimento(cliente).map((grupo) => (
+        <View key={grupo.estabelecimentoId} style={styles.grupoEstabelecimento}>
+          {estabelecimentosDoCliente(cliente).length > 1 && (
+            <Text style={styles.grupoEstabelecimentoTitulo}>{grupo.estabelecimentoNome}</Text>
+          )}
+          <View style={styles.listaProdutos}>
+            {grupo.produtos.map((produto) => (
+              <View key={produto.id} style={styles.produtoCard}>
+                <View style={styles.produtoLinha}>
+                  <Text style={styles.produtoNome}>
+                    {produto.nome}
+                    {produto.quantidade > 1 ? `  ×${produto.quantidade}` : ""}
+                  </Text>
+                  <Text style={styles.produtoValor}>
+                    {formatarMoeda(produto.valorUnitario * produto.quantidade)}
+                  </Text>
+                </View>
+                {produto.prazoMeses ? (
+                  <Text style={styles.produtoPrazo}>
+                    {labelPrazo(produto.prazoMeses)}
+                    {produto.descontoPercentual ? ` · ${produto.descontoPercentual}% de desconto` : ""}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
       <View style={styles.totalLinha}>
         <Text style={styles.totalLabel}>Total</Text>
         <Text style={styles.totalValor}>
@@ -406,6 +416,13 @@ const styles = StyleSheet.create({
   tagTexto: { color: colors.accent, fontSize: 13, fontFamily: "Prompt_600SemiBold" },
   tagEstabelecimento: { backgroundColor: colors.warning + "33" },
   tagTextoEstabelecimento: { color: colors.primary },
+  grupoEstabelecimento: { marginBottom: 10 },
+  grupoEstabelecimentoTitulo: {
+    fontFamily: "Prompt_600SemiBold",
+    color: colors.primary,
+    fontSize: 12,
+    marginBottom: 6,
+  },
   listaProdutos: { gap: 6, marginBottom: 8 },
   produtoCard: {
     backgroundColor: colors.accent + "11",

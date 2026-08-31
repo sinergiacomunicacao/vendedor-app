@@ -18,6 +18,7 @@ import {
   Cliente,
   ESTAGIOS,
   Estagio,
+  estabelecimentosDoCliente,
   labelPrazo,
   normalizarProdutoInteresse,
   valorTotalCliente,
@@ -77,8 +78,10 @@ export default function RelatorioScreen({ navigation }: Props) {
     const fim = parseData(dataFim, true);
     return clientes.filter((cliente) => {
       if (vendedorIds.length > 0 && !vendedorIds.includes(cliente.vendedorId)) return false;
-      if (estabelecimentoNomes.length > 0 && !estabelecimentoNomes.includes(cliente.estabelecimento))
-        return false;
+      if (estabelecimentoNomes.length > 0) {
+        const nomesDoCliente = estabelecimentosDoCliente(cliente).map((e) => e.nome);
+        if (!nomesDoCliente.some((nome) => estabelecimentoNomes.includes(nome))) return false;
+      }
       if (clienteIds.length > 0 && !clienteIds.includes(cliente.id)) return false;
       if (inicio !== null && cliente.criadoEm < inicio) return false;
       if (fim !== null && cliente.criadoEm > fim) return false;
@@ -129,7 +132,9 @@ export default function RelatorioScreen({ navigation }: Props) {
         cliente.cnpj,
         cliente.telefone,
         cliente.email,
-        cliente.estabelecimento,
+        estabelecimentosDoCliente(cliente)
+          .map((e) => e.nome)
+          .join(", "),
         cliente.produtosInteresse
           .map(normalizarProdutoInteresse)
           .map((p) => {
@@ -330,7 +335,12 @@ export default function RelatorioScreen({ navigation }: Props) {
                   )}
                 </View>
                 <Text style={styles.detalhe}>Vendedor: {nomeVendedor(item.vendedorId)}</Text>
-                <Text style={styles.detalhe}>Estabelecimento: {item.estabelecimento}</Text>
+                <Text style={styles.detalhe}>
+                  Estabelecimento{estabelecimentosDoCliente(item).length > 1 ? "s" : ""}:{" "}
+                  {estabelecimentosDoCliente(item)
+                    .map((e) => e.nome)
+                    .join(", ")}
+                </Text>
                 <Text style={styles.detalhe}>
                   Cadastrado em: {new Date(item.criadoEm).toLocaleDateString("pt-BR")}
                 </Text>

@@ -6,7 +6,15 @@ import { useAuth } from "../contexts/AuthContext";
 import { AppStackParamList } from "../navigation/types";
 import { ouvirClientesDoVendedor } from "../services/clientes";
 import { colors } from "../theme/colors";
-import { Cliente, ESTAGIOS, Estagio, normalizarProdutoInteresse, valorTotalCliente } from "../types";
+import {
+  Cliente,
+  ESTAGIOS,
+  Estagio,
+  diasParaVencimento,
+  estabelecimentosDoCliente,
+  normalizarProdutoInteresse,
+  valorTotalCliente,
+} from "../types";
 import { formatarMoeda } from "../utils/format";
 
 const CORES_ESTAGIO: Record<Estagio, string> = {
@@ -49,7 +57,7 @@ export default function ClientesScreen({ navigation }: Props) {
         cliente.cnpj,
         cliente.telefone,
         cliente.email,
-        cliente.estabelecimento,
+        ...estabelecimentosDoCliente(cliente).map((e) => e.nome),
         cliente.observacoes ?? "",
       ]
         .join(" ")
@@ -61,6 +69,15 @@ export default function ClientesScreen({ navigation }: Props) {
   const renderItem = useCallback(
     ({ item }: { item: Cliente }) => {
       const estagio = item.estagio ?? "contato";
+      const diasRestantes = diasParaVencimento(item);
+      const alertaVencimento =
+        diasRestantes !== null && diasRestantes <= 15
+          ? diasRestantes < 0
+            ? `Contrato vencido há ${Math.abs(diasRestantes)} dia${Math.abs(diasRestantes) === 1 ? "" : "s"}`
+            : diasRestantes === 0
+              ? "Contrato vence hoje"
+              : `Contrato vence em ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"}`
+          : null;
       return (
         <Pressable
           style={styles.card}
@@ -72,16 +89,17 @@ export default function ClientesScreen({ navigation }: Props) {
               <Text style={styles.tagEstagioTexto}>{labelEstagio(estagio)}</Text>
             </View>
           </View>
+          {alertaVencimento && <Text style={styles.alertaVencimento}>{alertaVencimento}</Text>}
           <Text style={styles.detalhe}>CNPJ: {item.cnpj}</Text>
           <Text style={styles.detalhe}>Telefone: {item.telefone}</Text>
           <Text style={styles.detalhe}>Email: {item.email}</Text>
           <Text style={styles.detalheValor}>{formatarMoeda(valorTotalCliente(item.produtosInteresse))}</Text>
           <View style={styles.tagsLinha}>
-            <View style={[styles.tag, styles.tagEstabelecimento]}>
-              <Text style={[styles.tagTexto, styles.tagTextoEstabelecimento]}>
-                {item.estabelecimento}
-              </Text>
-            </View>
+            {estabelecimentosDoCliente(item).map((est) => (
+              <View key={est.id} style={[styles.tag, styles.tagEstabelecimento]}>
+                <Text style={[styles.tagTexto, styles.tagTextoEstabelecimento]}>{est.nome}</Text>
+              </View>
+            ))}
             {item.produtosInteresse.map(normalizarProdutoInteresse).map((produto) => (
               <View key={produto.id} style={styles.tag}>
                 <Text style={styles.tagTexto}>
@@ -266,6 +284,12 @@ const styles = StyleSheet.create({
   },
   tagEstagio: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   tagEstagioTexto: { color: colors.surface, fontSize: 11, fontFamily: "Prompt_600SemiBold" },
+  alertaVencimento: {
+    fontSize: 13,
+    fontFamily: "Prompt_600SemiBold",
+    color: colors.danger,
+    marginBottom: 6,
+  },
   detalhe: { fontSize: 14, fontFamily: "Prompt_400Regular", color: colors.text, marginBottom: 2 },
   detalheValor: { fontSize: 14, fontFamily: "Prompt_600SemiBold", color: colors.primary, marginTop: 2 },
   tagsLinha: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
