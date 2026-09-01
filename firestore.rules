@@ -11,7 +11,7 @@ service cloud.firestore {
       allow read: if request.auth != null
         && (request.auth.uid == resource.data.vendedorId || isGestor());
       allow delete, update: if request.auth != null
-        && request.auth.uid == resource.data.vendedorId;
+        && (request.auth.uid == resource.data.vendedorId || isGestor());
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.vendedorId;
     }
