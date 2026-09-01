@@ -18,12 +18,15 @@ import {
   atualizarEstagioCliente,
   atualizarObservacoesCliente,
   cancelarCliente,
+  liberarProdutoCliente,
 } from "../services/clientes";
 import { colors } from "../theme/colors";
 import {
   Cliente,
   ESTAGIOS,
   Estagio,
+  ProdutoInteresse,
+  diasParaVencimentoProduto,
   estabelecimentosDoCliente,
   labelPrazo,
   produtosPorEstabelecimento,
@@ -54,6 +57,7 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
   const [salvandoDataFechamento, setSalvandoDataFechamento] = useState(false);
   const [modalCancelar, setModalCancelar] = useState(false);
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
+  const [liberandoProdutoId, setLiberandoProdutoId] = useState<string | null>(null);
 
   useEffect(() => {
     return onSnapshot(doc(db, "clientes", clienteId), (snapshot) => {
@@ -111,6 +115,32 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
     } finally {
       setMudandoEstagio(false);
     }
+  }
+
+  function handleLiberarProduto(produto: ProdutoInteresse) {
+    if (!cliente) return;
+    const chave = `${produto.estabelecimentoId}::${produto.id}`;
+    showAlert(
+      "Liberar produto",
+      `Remover "${produto.nome}" deste cliente e devolver ${produto.quantidade > 1 ? `as ${produto.quantidade} unidades` : "a unidade"} ao estoque? O restante do cadastro do cliente continua ativo.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Liberar",
+          style: "destructive",
+          onPress: async () => {
+            setLiberandoProdutoId(chave);
+            try {
+              await liberarProdutoCliente(cliente, produto.id, produto.estabelecimentoId ?? "");
+            } catch {
+              showAlert("Erro", "Não foi possível liberar o produto. Tente novamente.");
+            } finally {
+              setLiberandoProdutoId(null);
+            }
+          },
+        },
+      ]
+    );
   }
 
   function handleCancelar() {
@@ -246,25 +276,54 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
             <Text style={styles.grupoEstabelecimentoTitulo}>{grupo.estabelecimentoNome}</Text>
           )}
           <View style={styles.listaProdutos}>
-            {grupo.produtos.map((produto) => (
-              <View key={produto.id} style={styles.produtoCard}>
-                <View style={styles.produtoLinha}>
-                  <Text style={styles.produtoNome}>
-                    {produto.nome}
-                    {produto.quantidade > 1 ? `  ×${produto.quantidade}` : ""}
-                  </Text>
-                  <Text style={styles.produtoValor}>
-                    {formatarMoeda(produto.valorUnitario * produto.quantidade)}
-                  </Text>
+            {grupo.produtos.map((produto) => {
+              const diasRestantes = diasParaVencimentoProduto(cliente, produto);
+              const alertaVencimentoProduto =
+                diasRestantes !== null && diasRestantes <= 15
+                  ? diasRestantes < 0
+                    ? `Vencido há ${Math.abs(diasRestantes)} dia${Math.abs(diasRestantes) === 1 ? "" : "s"}`
+                    : diasRestantes === 0
+                      ? "Vence hoje"
+                      : `Vence em ${diasRestantes} dia${diasRestantes === 1 ? "" : "s"}`
+                  : null;
+              const chave = `${produto.estabelecimentoId}::${produto.id}`;
+              const liberando = liberandoProdutoId === chave;
+              return (
+                <View key={produto.id} style={styles.produtoCard}>
+                  <View style={styles.produtoLinha}>
+                    <Text style={styles.produtoNome}>
+                      {produto.nome}
+                      {produto.quantidade > 1 ? `  ×${produto.quantidade}` : ""}
+                    </Text>
+                    <Text style={styles.produtoValor}>
+                      {formatarMoeda(produto.valorUnitario * produto.quantidade)}
+                    </Text>
+                  </View>
+                  {produto.prazoMeses ? (
+                    <Text style={styles.produtoPrazo}>
+                      {labelPrazo(produto.prazoMeses)}
+                      {produto.descontoPercentual ? ` · ${produto.descontoPercentual}% de desconto` : ""}
+                    </Text>
+                  ) : null}
+                  {alertaVencimentoProduto && (
+                    <Text style={styles.produtoAlertaVencimento}>{alertaVencimentoProduto}</Text>
+                  )}
+                  {!cliente.cancelado && (
+                    <Pressable
+                      style={styles.botaoLiberarProduto}
+                      onPress={() => handleLiberarProduto(produto)}
+                      disabled={liberando}
+                    >
+                      {liberando ? (
+                        <ActivityIndicator color={colors.danger} size="small" />
+                      ) : (
+                        <Text style={styles.botaoLiberarProdutoTexto}>Liberar produto</Text>
+                      )}
+                    </Pressable>
+                  )}
                 </View>
-                {produto.prazoMeses ? (
-                  <Text style={styles.produtoPrazo}>
-                    {labelPrazo(produto.prazoMeses)}
-                    {produto.descontoPercentual ? ` · ${produto.descontoPercentual}% de desconto` : ""}
-                  </Text>
-                ) : null}
-              </View>
-            ))}
+              );
+            })}
           </View>
         </View>
       ))}
@@ -442,6 +501,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Prompt_400Regular",
     marginTop: 4,
+  },
+  produtoAlertaVencimento: {
+    color: colors.danger,
+    fontSize: 12,
+    fontFamily: "Prompt_600SemiBold",
+    marginTop: 4,
+  },
+  botaoLiberarProduto: {
+    alignSelf: "flex-start",
+    marginTop: 8,
+  },
+  botaoLiberarProdutoTexto: {
+    color: colors.danger,
+    fontSize: 12,
+    fontFamily: "Prompt_600SemiBold",
+    textDecorationLine: "underline",
   },
   totalLinha: {
     flexDirection: "row",

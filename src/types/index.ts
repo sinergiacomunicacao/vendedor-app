@@ -129,22 +129,35 @@ export function produtosPorEstabelecimento(
   return Array.from(grupos, ([estabelecimentoId, g]) => ({ estabelecimentoId, ...g }));
 }
 
-// Quantos dias faltam pro fim do contrato (data de fechamento + o maior
-// prazo entre os produtos do cliente). Retorna null quando não dá pra
-// calcular (sem data de fechamento, ou nenhum produto com prazo definido).
-export function diasParaVencimento(cliente: Cliente): number | null {
-  if (!cliente.dataFechamento) return null;
-  const maiorPrazoMeses = cliente.produtosInteresse
-    .map(normalizarProdutoInteresse)
-    .reduce((maior, p) => (p.prazoMeses && p.prazoMeses > maior ? p.prazoMeses : maior), 0);
-  if (maiorPrazoMeses === 0) return null;
+// Quantos dias faltam pro vencimento de um prazo específico (em meses),
+// contado a partir da data de fechamento do contrato. Retorna null quando
+// não dá pra calcular (sem data de fechamento, ou sem prazo definido).
+function diasParaVencimentoDoPrazo(dataFechamento: number | undefined, prazoMeses: number): number | null {
+  if (!dataFechamento || prazoMeses <= 0) return null;
 
-  const vencimento = new Date(cliente.dataFechamento);
-  vencimento.setMonth(vencimento.getMonth() + maiorPrazoMeses);
+  const vencimento = new Date(dataFechamento);
+  vencimento.setMonth(vencimento.getMonth() + prazoMeses);
 
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   vencimento.setHours(0, 0, 0, 0);
 
   return Math.round((vencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// Quantos dias faltam pro fim do contrato (data de fechamento + o maior
+// prazo entre os produtos do cliente) — usado no alerta resumido do card
+// do cliente. Retorna null quando não dá pra calcular.
+export function diasParaVencimento(cliente: Cliente): number | null {
+  const maiorPrazoMeses = cliente.produtosInteresse
+    .map(normalizarProdutoInteresse)
+    .reduce((maior, p) => (p.prazoMeses && p.prazoMeses > maior ? p.prazoMeses : maior), 0);
+  return diasParaVencimentoDoPrazo(cliente.dataFechamento, maiorPrazoMeses);
+}
+
+// Igual à anterior, mas para um único produto do cliente — cada produto tem
+// seu próprio prazo, então o vencimento pode ser diferente entre eles mesmo
+// compartilhando a mesma data de fechamento.
+export function diasParaVencimentoProduto(cliente: Cliente, produto: ProdutoInteresse): number | null {
+  return diasParaVencimentoDoPrazo(cliente.dataFechamento, produto.prazoMeses ?? 0);
 }

@@ -140,6 +140,34 @@ export async function atualizarDataFechamentoCliente(id: string, dataFechamento:
   });
 }
 
+// Remove um único produto da lista de interesse do cliente e devolve a
+// quantidade reservada ao estoque — usado quando o contrato daquele produto
+// específico vence (ou é encerrado) mas o cliente em si continua ativo,
+// diferente de cancelarCliente() que encerra o cadastro inteiro.
+export async function liberarProdutoCliente(
+  cliente: Cliente,
+  produtoId: string,
+  estabelecimentoId: string
+) {
+  await runTransaction(db, async (tx) => {
+    const produtos = cliente.produtosInteresse.map((item) => produtoComEstabelecimento(item, cliente));
+    const alvo = produtos.find((p) => p.id === produtoId && p.estabelecimentoId === estabelecimentoId);
+    if (!alvo) return;
+
+    if (alvo.estabelecimentoId) {
+      const ref = doc(db, "estabelecimentos", alvo.estabelecimentoId, "produtos", alvo.id);
+      const snap = await tx.get(ref);
+      if (snap.exists()) {
+        const estoque = (snap.data()?.estoque as number) ?? 0;
+        tx.update(ref, { estoque: estoque + alvo.quantidade });
+      }
+    }
+
+    const restantes = produtos.filter((p) => !(p.id === produtoId && p.estabelecimentoId === estabelecimentoId));
+    tx.update(doc(db, "clientes", cliente.id), { produtosInteresse: restantes });
+  });
+}
+
 export async function cancelarCliente(cliente: Cliente, motivo: string) {
   await runTransaction(db, async (tx) => {
     const produtos = cliente.produtosInteresse
