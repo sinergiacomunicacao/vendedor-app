@@ -4,7 +4,8 @@ import { FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
 import { AppStackParamList } from "../navigation/types";
-import { ouvirClientesDoVendedor } from "../services/clientes";
+import { ouvirClientesDoVendedor, ouvirTodosClientes } from "../services/clientes";
+import { ouvirVendedores, Vendedor } from "../services/vendedores";
 import { colors } from "../theme/colors";
 import {
   Cliente,
@@ -34,6 +35,7 @@ export default function ClientesScreen({ navigation }: Props) {
   const { user, gestor, sair } = useAuth();
   const insets = useSafeAreaInsets();
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [busca, setBusca] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
 
@@ -44,9 +46,23 @@ export default function ClientesScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (!user) return;
-    const unsubscribe = ouvirClientesDoVendedor(user.uid, setClientes);
+    // Gestor vê os clientes de toda a equipe nesta mesma tela; vendedor comum
+    // continua vendo só a própria carteira.
+    const unsubscribe = gestor
+      ? ouvirTodosClientes(setClientes)
+      : ouvirClientesDoVendedor(user.uid, setClientes);
     return unsubscribe;
-  }, [user]);
+  }, [user, gestor]);
+
+  useEffect(() => {
+    if (!gestor) return;
+    return ouvirVendedores(setVendedores);
+  }, [gestor]);
+
+  const nomeVendedor = useMemo(() => {
+    const mapa = new Map(vendedores.map((v) => [v.id, v.nome]));
+    return (id: string) => mapa.get(id) ?? "Vendedor removido";
+  }, [vendedores]);
 
   const clientesFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -59,12 +75,13 @@ export default function ClientesScreen({ navigation }: Props) {
         cliente.email,
         ...estabelecimentosDoCliente(cliente).map((e) => e.nome),
         cliente.observacoes ?? "",
+        gestor ? nomeVendedor(cliente.vendedorId) : "",
       ]
         .join(" ")
         .toLowerCase()
         .includes(termo)
     );
-  }, [clientes, busca]);
+  }, [clientes, busca, gestor, nomeVendedor]);
 
   const renderItem = useCallback(
     ({ item }: { item: Cliente }) => {
@@ -89,6 +106,7 @@ export default function ClientesScreen({ navigation }: Props) {
               <Text style={styles.tagEstagioTexto}>{labelEstagio(estagio)}</Text>
             </View>
           </View>
+          {gestor && <Text style={styles.detalheVendedor}>Vendedor: {nomeVendedor(item.vendedorId)}</Text>}
           {alertaVencimento && <Text style={styles.alertaVencimento}>{alertaVencimento}</Text>}
           <Text style={styles.detalhe}>CNPJ: {item.cnpj}</Text>
           <Text style={styles.detalhe}>Telefone: {item.telefone}</Text>
@@ -112,7 +130,7 @@ export default function ClientesScreen({ navigation }: Props) {
         </Pressable>
       );
     },
-    [navigation]
+    [navigation, gestor, nomeVendedor]
   );
 
   return (
@@ -291,6 +309,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   detalhe: { fontSize: 14, fontFamily: "Prompt_400Regular", color: colors.text, marginBottom: 2 },
+  detalheVendedor: {
+    fontSize: 13,
+    fontFamily: "Prompt_500Medium",
+    color: colors.textMuted,
+    marginBottom: 6,
+  },
   detalheValor: { fontSize: 14, fontFamily: "Prompt_600SemiBold", color: colors.primary, marginTop: 2 },
   tagsLinha: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   tag: {
