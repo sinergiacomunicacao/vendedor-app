@@ -44,6 +44,7 @@ export type Cliente = {
   vendedorId: string;
   cnpj: string;
   razaoSocial: string;
+  responsavel?: string;
   telefone: string;
   email: string;
   produtosInteresse: (ProdutoInteresseAntigo | string)[];

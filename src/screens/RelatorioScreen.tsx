@@ -93,7 +93,11 @@ export default function RelatorioScreen({ navigation }: Props) {
     const termo = buscaCliente.trim().toLowerCase();
     if (!termo) return [];
     return clientes
-      .filter((c) => c.razaoSocial.toLowerCase().includes(termo))
+      .filter(
+        (c) =>
+          c.razaoSocial.toLowerCase().includes(termo) ||
+          (c.responsavel ?? "").toLowerCase().includes(termo)
+      )
       .sort((a, b) => a.razaoSocial.localeCompare(b.razaoSocial))
       .slice(0, 20);
   }, [clientes, buscaCliente]);
@@ -113,6 +117,7 @@ export default function RelatorioScreen({ navigation }: Props) {
     try {
       const colunas = [
         "Razão Social",
+        "Responsável",
         "CNPJ",
         "Telefone",
         "Email",
@@ -129,6 +134,7 @@ export default function RelatorioScreen({ navigation }: Props) {
       ];
       const linhas = clientesFiltrados.map((cliente) => [
         cliente.razaoSocial,
+        cliente.responsavel ?? "",
         cliente.cnpj,
         cliente.telefone,
         cliente.email,
@@ -335,6 +341,9 @@ export default function RelatorioScreen({ navigation }: Props) {
                   )}
                 </View>
                 <Text style={styles.detalhe}>Vendedor: {nomeVendedor(item.vendedorId)}</Text>
+                {item.responsavel ? (
+                  <Text style={styles.detalhe}>Responsável: {item.responsavel}</Text>
+                ) : null}
                 <Text style={styles.detalhe}>
                   Estabelecimento{estabelecimentosDoCliente(item).length > 1 ? "s" : ""}:{" "}
                   {estabelecimentosDoCliente(item)

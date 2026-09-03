@@ -39,6 +39,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   const [carregandoCliente, setCarregandoCliente] = useState(modoEdicao);
   const [cnpj, setCnpj] = useState("");
   const [razaoSocial, setRazaoSocial] = useState("");
+  const [responsavel, setResponsavel] = useState("");
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
   const [estabelecimentos, setEstabelecimentos] = useState<Estabelecimento[]>([]);
@@ -64,6 +65,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       }
       setCnpj(cliente.cnpj);
       setRazaoSocial(cliente.razaoSocial);
+      setResponsavel(cliente.responsavel ?? "");
       setTelefone(cliente.telefone);
       setEmail(cliente.email);
       setObservacoes(cliente.observacoes ?? "");
@@ -218,6 +220,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       vendedorId: user.uid,
       cnpj,
       razaoSocial: razaoSocial.trim(),
+      responsavel: responsavel.trim(),
       telefone,
       email: email.trim(),
       produtosSelecionados,
@@ -277,6 +280,14 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
           placeholder="Nome da empresa"
           value={razaoSocial}
           onChangeText={setRazaoSocial}
+        />
+
+        <Text style={styles.label}>Responsável pelo contato</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Nome de quem trata o contrato"
+          value={responsavel}
+          onChangeText={setResponsavel}
         />
 
         <Text style={styles.label}>Telefone</Text>

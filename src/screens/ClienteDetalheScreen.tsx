@@ -249,6 +249,12 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
         <Text style={styles.rotulo}>CNPJ</Text>
         <Text style={styles.valor}>{cliente.cnpj}</Text>
       </View>
+      {cliente.responsavel ? (
+        <View style={styles.campo}>
+          <Text style={styles.rotulo}>Responsável pelo contato</Text>
+          <Text style={styles.valor}>{cliente.responsavel}</Text>
+        </View>
+      ) : null}
       <View style={styles.campo}>
         <Text style={styles.rotulo}>Telefone</Text>
         <Text style={styles.valor}>{cliente.telefone}</Text>

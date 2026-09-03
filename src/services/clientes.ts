@@ -32,6 +32,7 @@ export type DadosCliente = {
   vendedorId: string;
   cnpj: string;
   razaoSocial: string;
+  responsavel?: string;
   telefone: string;
   email: string;
   produtosSelecionados: ProdutoInteresse[];
@@ -63,6 +64,7 @@ export async function criarCliente(dados: DadosCliente) {
       vendedorId: dados.vendedorId,
       cnpj: dados.cnpj,
       razaoSocial: dados.razaoSocial,
+      responsavel: dados.responsavel?.trim() ?? "",
       telefone: dados.telefone,
       email: dados.email,
       produtosInteresse: dados.produtosSelecionados,
@@ -122,6 +124,7 @@ export async function atualizarCliente(
     tx.update(doc(db, "clientes", clienteId), {
       cnpj: dados.cnpj,
       razaoSocial: dados.razaoSocial,
+      responsavel: dados.responsavel?.trim() ?? "",
       telefone: dados.telefone,
       email: dados.email,
       produtosInteresse: dados.produtosSelecionados,

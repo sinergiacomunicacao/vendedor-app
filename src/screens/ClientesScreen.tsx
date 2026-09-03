@@ -71,6 +71,7 @@ export default function ClientesScreen({ navigation }: Props) {
       [
         cliente.razaoSocial,
         cliente.cnpj,
+        cliente.responsavel ?? "",
         cliente.telefone,
         cliente.email,
         ...estabelecimentosDoCliente(cliente).map((e) => e.nome),
@@ -109,6 +110,9 @@ export default function ClientesScreen({ navigation }: Props) {
           {gestor && <Text style={styles.detalheVendedor}>Vendedor: {nomeVendedor(item.vendedorId)}</Text>}
           {alertaVencimento && <Text style={styles.alertaVencimento}>{alertaVencimento}</Text>}
           <Text style={styles.detalhe}>CNPJ: {item.cnpj}</Text>
+          {item.responsavel ? (
+            <Text style={styles.detalhe}>Responsável: {item.responsavel}</Text>
+          ) : null}
           <Text style={styles.detalhe}>Telefone: {item.telefone}</Text>
           <Text style={styles.detalhe}>Email: {item.email}</Text>
           <Text style={styles.detalheValor}>{formatarMoeda(valorTotalCliente(item.produtosInteresse))}</Text>
