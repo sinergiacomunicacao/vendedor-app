@@ -7,6 +7,20 @@ export const ESTAGIOS: { id: Estagio; label: string }[] = [
   { id: "perdido", label: "Perdido" },
 ];
 
+// Espelho público e minimalista de Cliente — usado pela lista "Empresas
+// atendidas", visível para qualquer vendedor autenticado (não só o dono ou
+// o gestor), para evitar que dois vendedores abordem a mesma empresa sem
+// saber. De propósito não carrega telefone/email/produtos/valores: só o
+// necessário para identificar a empresa e quem já a atendeu.
+export type EmpresaAtendida = {
+  id: string;
+  razaoSocial: string;
+  cnpj: string;
+  vendedorId: string;
+  vendedorNome: string;
+  criadoEm: number;
+};
+
 export type PrazoContrato = {
   id: string;
   meses: number;

@@ -16,6 +16,20 @@ service cloud.firestore {
         && request.auth.uid == request.resource.data.vendedorId;
     }
 
+    // Espelho minimalista de clientes (razão social, CNPJ, vendedor) —
+    // legível por qualquer vendedor autenticado, para evitar que dois
+    // vendedores abordem a mesma empresa sem saber. Só os campos de
+    // criarCliente()/atualizarCliente() ficam aqui, nunca telefone/email/
+    // produtos/valores.
+    match /empresasAtendidas/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && (request.auth.uid == request.resource.data.vendedorId || isGestor());
+      allow update: if request.auth != null
+        && (request.auth.uid == resource.data.vendedorId || isGestor());
+      allow delete: if isGestor();
+    }
+
     match /vendedores/{vendedorId} {
       allow read: if request.auth != null
         && (request.auth.uid == vendedorId || isGestor());

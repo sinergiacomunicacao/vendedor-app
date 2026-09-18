@@ -218,6 +218,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
 
     const dados = {
       vendedorId: user.uid,
+      vendedorNome: user.displayName ?? "",
       cnpj,
       razaoSocial: razaoSocial.trim(),
       responsavel: responsavel.trim(),

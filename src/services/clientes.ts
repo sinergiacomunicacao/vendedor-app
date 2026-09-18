@@ -12,13 +12,18 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { Cliente, Estagio, ProdutoInteresse, produtoComEstabelecimento } from "../types";
+import { Cliente, EmpresaAtendida, Estagio, ProdutoInteresse, produtoComEstabelecimento } from "../types";
 
 const LIMITE_CLIENTES = 200;
 const LIMITE_RELATORIO = 1000;
+const LIMITE_EMPRESAS_ATENDIDAS = 2000;
 
 function clientesRef() {
   return collection(db, "clientes");
+}
+
+function empresaAtendidaRef(clienteId: string) {
+  return doc(db, "empresasAtendidas", clienteId);
 }
 
 // Chave composta (estabelecimento + produto) — um mesmo produtoId só existe
@@ -30,6 +35,7 @@ function chaveProduto(estabelecimentoId: string, produtoId: string) {
 
 export type DadosCliente = {
   vendedorId: string;
+  vendedorNome: string;
   cnpj: string;
   razaoSocial: string;
   responsavel?: string;
@@ -60,6 +66,7 @@ export async function criarCliente(dados: DadosCliente) {
     });
 
     const clienteRef = doc(clientesRef());
+    const criadoEm = Date.now();
     tx.set(clienteRef, {
       vendedorId: dados.vendedorId,
       cnpj: dados.cnpj,
@@ -70,7 +77,18 @@ export async function criarCliente(dados: DadosCliente) {
       produtosInteresse: dados.produtosSelecionados,
       estagio: "contato",
       observacoes: dados.observacoes?.trim() ?? "",
-      criadoEm: Date.now(),
+      criadoEm,
+    });
+    // Espelho minimalista (razão social, CNPJ, vendedor) para a lista
+    // "Empresas atendidas", legível por qualquer vendedor. O nome do
+    // vendedor é gravado aqui (não resolvido via join) porque a coleção
+    // vendedores só é listável por gestor.
+    tx.set(empresaAtendidaRef(clienteRef.id), {
+      razaoSocial: dados.razaoSocial,
+      cnpj: dados.cnpj,
+      vendedorId: dados.vendedorId,
+      vendedorNome: dados.vendedorNome,
+      criadoEm,
     });
   });
 }
@@ -81,6 +99,11 @@ export async function atualizarCliente(
   produtosOriginais: ProdutoInteresse[]
 ) {
   await runTransaction(db, async (tx) => {
+    // Lido antes de qualquer escrita (exigência de transação do Firestore) —
+    // usado para manter o espelho em empresasAtendidas com o vendedor e a
+    // data originais do cliente, mesmo quando quem edita é um gestor.
+    const empresaSnapAntes = await tx.get(empresaAtendidaRef(clienteId));
+
     const qtdOriginal = new Map(
       produtosOriginais.map((p) => [chaveProduto(p.estabelecimentoId || "", p.id), p.quantidade])
     );
@@ -129,6 +152,15 @@ export async function atualizarCliente(
       email: dados.email,
       produtosInteresse: dados.produtosSelecionados,
       observacoes: dados.observacoes?.trim() ?? "",
+    });
+
+    const empresaAntes = empresaSnapAntes.data();
+    tx.set(empresaAtendidaRef(clienteId), {
+      razaoSocial: dados.razaoSocial,
+      cnpj: dados.cnpj,
+      vendedorId: (empresaAntes?.vendedorId as string) ?? dados.vendedorId,
+      vendedorNome: (empresaAntes?.vendedorNome as string) ?? dados.vendedorNome,
+      criadoEm: (empresaAntes?.criadoEm as number) ?? Date.now(),
     });
   });
 }
@@ -225,6 +257,21 @@ export function ouvirTodosClientes(callback: (clientes: Cliente[]) => void) {
       ...(doc.data() as Omit<Cliente, "id">),
     }));
     callback(clientes);
+  });
+}
+
+export function ouvirEmpresasAtendidas(callback: (empresas: EmpresaAtendida[]) => void) {
+  const q = query(
+    collection(db, "empresasAtendidas"),
+    orderBy("razaoSocial", "asc"),
+    limit(LIMITE_EMPRESAS_ATENDIDAS)
+  );
+  return onSnapshot(q, (snapshot) => {
+    const empresas = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as Omit<EmpresaAtendida, "id">),
+    }));
+    callback(empresas);
   });
 }
 

@@ -39,7 +39,7 @@ export default function ClientesScreen({ navigation }: Props) {
   const [busca, setBusca] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
 
-  function irPara(tela: "Relatorio" | "Estabelecimentos" | "PrazosContrato") {
+  function irPara(tela: "Relatorio" | "Estabelecimentos" | "PrazosContrato" | "EmpresasAtendidas") {
     setMenuAberto(false);
     navigation.navigate(tela);
   }
@@ -158,11 +158,9 @@ export default function ClientesScreen({ navigation }: Props) {
           </View>
         </View>
         <View style={styles.headerAcoes}>
-          {gestor && (
-            <Pressable onPress={() => setMenuAberto(true)} hitSlop={8}>
-              <Text style={styles.link}>Menu</Text>
-            </Pressable>
-          )}
+          <Pressable onPress={() => setMenuAberto(true)} hitSlop={8}>
+            <Text style={styles.link}>Menu</Text>
+          </Pressable>
           <Pressable onPress={sair} hitSlop={8}>
             <Text style={styles.sair}>Sair</Text>
           </Pressable>
@@ -177,14 +175,24 @@ export default function ClientesScreen({ navigation }: Props) {
       >
         <Pressable style={styles.menuFundo} onPress={() => setMenuAberto(false)}>
           <View style={[styles.menuCaixa, { marginTop: insets.top + 70 }]}>
-            <Pressable style={styles.menuItem} onPress={() => irPara("Relatorio")}>
-              <Text style={styles.menuItemTexto}>Relatório</Text>
-            </Pressable>
-            <Pressable style={styles.menuItem} onPress={() => irPara("Estabelecimentos")}>
-              <Text style={styles.menuItemTexto}>Estabelecimentos</Text>
-            </Pressable>
-            <Pressable style={[styles.menuItem, styles.menuItemUltimo]} onPress={() => irPara("PrazosContrato")}>
-              <Text style={styles.menuItemTexto}>Prazos de contrato</Text>
+            {gestor && (
+              <>
+                <Pressable style={styles.menuItem} onPress={() => irPara("Relatorio")}>
+                  <Text style={styles.menuItemTexto}>Relatório</Text>
+                </Pressable>
+                <Pressable style={styles.menuItem} onPress={() => irPara("Estabelecimentos")}>
+                  <Text style={styles.menuItemTexto}>Estabelecimentos</Text>
+                </Pressable>
+                <Pressable style={styles.menuItem} onPress={() => irPara("PrazosContrato")}>
+                  <Text style={styles.menuItemTexto}>Prazos de contrato</Text>
+                </Pressable>
+              </>
+            )}
+            <Pressable
+              style={[styles.menuItem, styles.menuItemUltimo]}
+              onPress={() => irPara("EmpresasAtendidas")}
+            >
+              <Text style={styles.menuItemTexto}>Empresas atendidas</Text>
             </Pressable>
           </View>
         </Pressable>

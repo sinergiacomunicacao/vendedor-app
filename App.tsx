@@ -25,6 +25,7 @@ import ProdutosScreen from "./src/screens/ProdutosScreen";
 import ClienteDetalheScreen from "./src/screens/ClienteDetalheScreen";
 import RelatorioScreen from "./src/screens/RelatorioScreen";
 import PrazosContratoScreen from "./src/screens/PrazosContratoScreen";
+import EmpresasAtendidasScreen from "./src/screens/EmpresasAtendidasScreen";
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const AppStack = createNativeStackNavigator<AppStackParamList>();
@@ -120,6 +121,17 @@ function Root() {
             options={{
               headerShown: true,
               title: "Prazos de contrato",
+              headerStyle: { backgroundColor: colors.primary },
+              headerTintColor: "#fff",
+              headerTitleStyle: { fontFamily: "Prompt_600SemiBold" },
+            }}
+          />
+          <AppStack.Screen
+            name="EmpresasAtendidas"
+            component={EmpresasAtendidasScreen}
+            options={{
+              headerShown: true,
+              title: "Empresas atendidas",
               headerStyle: { backgroundColor: colors.primary },
               headerTintColor: "#fff",
               headerTitleStyle: { fontFamily: "Prompt_600SemiBold" },
