@@ -36,6 +36,7 @@ export default function ProdutosScreen({ route }: Props) {
   const [estoqueEdicao, setEstoqueEdicao] = useState("");
   const [valorEdicao, setValorEdicao] = useState("");
   const [erro, setErro] = useState("");
+  const [erroEdicao, setErroEdicao] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => ouvirProdutos(estabelecimentoId, setProdutos), [estabelecimentoId]);
@@ -78,12 +79,21 @@ export default function ProdutosScreen({ route }: Props) {
     setNomeEdicao(produto.nome);
     setEstoqueEdicao(String(produto.estoque));
     setValorEdicao(produto.valorTabela ? maskMoeda(String(Math.round(produto.valorTabela * 100))) : "");
+    setErroEdicao("");
   }
 
   async function salvarEdicao(produtoId: string) {
+    setErroEdicao("");
     const nomeLimpo = nomeEdicao.trim();
     const estoqueNumero = Number(estoqueEdicao);
-    if (!nomeLimpo || Number.isNaN(estoqueNumero) || estoqueNumero < 0) return;
+    if (!nomeLimpo) {
+      setErroEdicao("Informe o nome do produto.");
+      return;
+    }
+    if (!estoqueEdicao.trim() || Number.isNaN(estoqueNumero) || estoqueNumero < 0) {
+      setErroEdicao("Informe uma quantidade em estoque válida.");
+      return;
+    }
     try {
       await atualizarProduto(estabelecimentoId, produtoId, {
         nome: nomeLimpo,
@@ -160,31 +170,39 @@ export default function ProdutosScreen({ route }: Props) {
         }
         renderItem={({ item }) =>
           editandoId === item.id ? (
-            <View style={styles.item}>
+            <View style={styles.itemEdicao}>
               <TextInput
                 style={styles.inputEdicao}
+                placeholder="Nome do produto"
                 value={nomeEdicao}
                 onChangeText={setNomeEdicao}
                 autoFocus
               />
-              <TextInput
-                style={styles.inputEdicaoEstoque}
-                value={estoqueEdicao}
-                onChangeText={setEstoqueEdicao}
-                keyboardType="number-pad"
-              />
-              <TextInput
-                style={styles.inputEdicaoValor}
-                value={valorEdicao}
-                onChangeText={(v) => setValorEdicao(maskMoeda(v))}
-                keyboardType="number-pad"
-              />
-              <Pressable onPress={() => salvarEdicao(item.id)}>
-                <Text style={styles.acaoSalvar}>Salvar</Text>
-              </Pressable>
-              <Pressable onPress={() => setEditandoId(null)}>
-                <Text style={styles.acaoCancelar}>Cancelar</Text>
-              </Pressable>
+              <View style={styles.formLinha}>
+                <TextInput
+                  style={styles.inputEdicaoEstoque}
+                  placeholder="Estoque"
+                  value={estoqueEdicao}
+                  onChangeText={setEstoqueEdicao}
+                  keyboardType="number-pad"
+                />
+                <TextInput
+                  style={styles.inputEdicaoValor}
+                  placeholder="Valor de tabela"
+                  value={valorEdicao}
+                  onChangeText={(v) => setValorEdicao(maskMoeda(v))}
+                  keyboardType="number-pad"
+                />
+              </View>
+              {erroEdicao ? <Text style={styles.erro}>{erroEdicao}</Text> : null}
+              <View style={styles.acoes}>
+                <Pressable onPress={() => salvarEdicao(item.id)}>
+                  <Text style={styles.acaoSalvar}>Salvar</Text>
+                </Pressable>
+                <Pressable onPress={() => setEditandoId(null)}>
+                  <Text style={styles.acaoCancelar}>Cancelar</Text>
+                </Pressable>
+              </View>
             </View>
           ) : (
             <View style={styles.item}>
@@ -247,32 +265,39 @@ const styles = StyleSheet.create({
     fontFamily: "Prompt_400Regular",
     color: colors.text,
   },
+  itemEdicao: {
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: 8,
+  },
   inputEdicao: {
-    flex: 1,
     borderWidth: 1,
     borderColor: colors.accent,
     borderRadius: 8,
-    padding: 8,
+    padding: 10,
     fontSize: 15,
     fontFamily: "Prompt_400Regular",
     color: colors.text,
   },
   inputEdicaoEstoque: {
-    width: 60,
+    width: 110,
     borderWidth: 1,
     borderColor: colors.accent,
     borderRadius: 8,
-    padding: 8,
+    padding: 10,
     fontSize: 15,
     fontFamily: "Prompt_400Regular",
     color: colors.text,
   },
   inputEdicaoValor: {
-    width: 100,
+    flex: 1,
+    minWidth: 0,
     borderWidth: 1,
     borderColor: colors.accent,
     borderRadius: 8,
-    padding: 8,
+    padding: 10,
     fontSize: 15,
     fontFamily: "Prompt_400Regular",
     color: colors.text,
