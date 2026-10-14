@@ -25,7 +25,7 @@ import {
   valorTotalCliente,
 } from "../types";
 import { exportarPlanilha } from "../utils/planilha";
-import { formatarMoeda, maskData, parseData } from "../utils/format";
+import { formatarMoeda, formatarPercentual, maskData, parseData } from "../utils/format";
 
 type Props = NativeStackScreenProps<AppStackParamList, "Relatorio">;
 
@@ -157,10 +157,14 @@ export default function RelatorioScreen({ navigation }: Props) {
           .map(normalizarProdutoInteresse)
           .map((p) => {
             const qtd = p.quantidade > 1 ? ` ×${p.quantidade}` : "";
-            const prazo = p.prazoMeses
-              ? ` (${labelPrazo(p.prazoMeses)}${p.descontoPercentual ? `, -${p.descontoPercentual}%` : ""})`
-              : "";
-            return `${p.nome}${qtd}${prazo}`;
+            const desconto = [
+              p.descontoDescricao,
+              p.prazoMeses ? labelPrazo(p.prazoMeses) : "",
+              p.descontoPercentual ? `-${formatarPercentual(p.descontoPercentual)}` : "",
+            ]
+              .filter(Boolean)
+              .join(", ");
+            return `${p.nome}${qtd}${desconto ? ` (${desconto})` : ""}`;
           })
           .join("; "),
         formatarMoeda(valorTotalCliente(cliente.produtosInteresse)),

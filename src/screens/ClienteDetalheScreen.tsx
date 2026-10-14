@@ -30,8 +30,8 @@ import {
   ProdutoInteresse,
   diasParaVencimentoProduto,
   estabelecimentosDoCliente,
-  labelPrazo,
   produtosPorEstabelecimento,
+  resumoDescontoProduto,
   statusDesconto,
   valorTotalCliente,
 } from "../types";
@@ -334,11 +334,8 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
                       {formatarMoeda(produto.valorUnitario * produto.quantidade)}
                     </Text>
                   </View>
-                  {produto.prazoMeses ? (
-                    <Text style={styles.produtoPrazo}>
-                      {labelPrazo(produto.prazoMeses)}
-                      {produto.descontoPercentual ? ` · ${produto.descontoPercentual}% de desconto` : ""}
-                    </Text>
+                  {resumoDescontoProduto(produto) ? (
+                    <Text style={styles.produtoPrazo}>{resumoDescontoProduto(produto)}</Text>
                   ) : null}
                   {alertaVencimentoProduto && (
                     <Text style={styles.produtoAlertaVencimento}>{alertaVencimentoProduto}</Text>

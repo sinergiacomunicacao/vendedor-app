@@ -1,3 +1,5 @@
+import { formatarPercentual } from "../utils/format";
+
 export type Estagio = "contato" | "reuniao" | "fechado" | "perdido";
 
 export const ESTAGIOS: { id: Estagio; label: string }[] = [
@@ -21,10 +23,14 @@ export type EmpresaAtendida = {
   criadoEm: number;
 };
 
-export type PrazoContrato = {
+// Desconto padrão que o vendedor escolhe por produto. `meses` é opcional: só
+// quando existe o app calcula o vencimento do contrato (e libera a tela de
+// volta pro estoque). Guardado na coleção `prazosContrato` por histórico.
+export type DescontoPadrao = {
   id: string;
-  meses: number;
+  descricao: string;
   descontoPercentual: number;
+  meses?: number;
 };
 
 export type ProdutoInteresse = {
@@ -34,6 +40,10 @@ export type ProdutoInteresse = {
   valorUnitario: number;
   prazoMeses?: number;
   descontoPercentual?: number;
+  // Cópia do desconto padrão escolhido: o cliente mantém o que foi negociado
+  // mesmo que o gestor edite ou apague o desconto padrão depois.
+  descontoId?: string;
+  descontoDescricao?: string;
   // Cada produto carrega o próprio estabelecimento — permite que um cliente
   // tenha interesse em anunciar em mais de um estabelecimento ao mesmo tempo.
   // Ausente em registros antigos (formato de um único estabelecimento por
@@ -49,6 +59,8 @@ type ProdutoInteresseAntigo = {
   valorUnitario?: number;
   prazoMeses?: number;
   descontoPercentual?: number;
+  descontoId?: string;
+  descontoDescricao?: string;
   estabelecimentoId?: string;
   estabelecimentoNome?: string;
 };
@@ -94,6 +106,8 @@ export function normalizarProdutoInteresse(item: ProdutoInteresseAntigo | string
     valorUnitario: item.valorUnitario ?? 0,
     prazoMeses: item.prazoMeses,
     descontoPercentual: item.descontoPercentual,
+    descontoId: item.descontoId,
+    descontoDescricao: item.descontoDescricao,
     estabelecimentoId: item.estabelecimentoId,
     estabelecimentoNome: item.estabelecimentoNome,
   };
@@ -101,6 +115,26 @@ export function normalizarProdutoInteresse(item: ProdutoInteresseAntigo | string
 
 export function labelPrazo(meses: number) {
   return meses === 1 ? "1 mês" : `${meses} meses`;
+}
+
+// Nome do desconto padrão nos botões de escolha. Registros antigos não têm
+// descrição, então cai no prazo ("12 meses").
+export function nomeDescontoPadrao(d: Pick<DescontoPadrao, "descricao" | "meses">) {
+  const descricao = d.descricao?.trim();
+  if (descricao && d.meses) return `${descricao} · ${labelPrazo(d.meses)}`;
+  if (descricao) return descricao;
+  if (d.meses) return labelPrazo(d.meses);
+  return "Desconto";
+}
+
+// Texto do desconto aplicado a um produto do cliente (ficha do cliente).
+// Vazio quando o produto não tem desconto nem prazo.
+export function resumoDescontoProduto(p: ProdutoInteresse): string {
+  const partes: string[] = [];
+  if (p.descontoDescricao) partes.push(p.descontoDescricao);
+  if (p.prazoMeses) partes.push(labelPrazo(p.prazoMeses));
+  if (p.descontoPercentual) partes.push(`${formatarPercentual(p.descontoPercentual)} de desconto`);
+  return partes.join(" · ");
 }
 
 export function valorTotalCliente(produtosInteresse: (ProdutoInteresseAntigo | string)[]): number {

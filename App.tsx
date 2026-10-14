@@ -24,7 +24,7 @@ import EstabelecimentosScreen from "./src/screens/EstabelecimentosScreen";
 import ProdutosScreen from "./src/screens/ProdutosScreen";
 import ClienteDetalheScreen from "./src/screens/ClienteDetalheScreen";
 import RelatorioScreen from "./src/screens/RelatorioScreen";
-import PrazosContratoScreen from "./src/screens/PrazosContratoScreen";
+import DescontosPadraoScreen from "./src/screens/DescontosPadraoScreen";
 import EmpresasAtendidasScreen from "./src/screens/EmpresasAtendidasScreen";
 import VendedoresScreen from "./src/screens/VendedoresScreen";
 
@@ -117,11 +117,11 @@ function Root() {
             }}
           />
           <AppStack.Screen
-            name="PrazosContrato"
-            component={PrazosContratoScreen}
+            name="DescontosPadrao"
+            component={DescontosPadraoScreen}
             options={{
               headerShown: true,
-              title: "Prazos de contrato",
+              title: "Descontos padrão",
               headerStyle: { backgroundColor: colors.primary },
               headerTintColor: "#fff",
               headerTitleStyle: { fontFamily: "Prompt_600SemiBold" },

@@ -20,10 +20,22 @@ import {
   ouvirEstabelecimentos,
   ouvirProdutos,
 } from "../services/estabelecimentos";
-import { ouvirPrazos } from "../services/prazos";
+import { ouvirDescontos } from "../services/descontos";
 import { colors } from "../theme/colors";
-import { PrazoContrato, ProdutoInteresse, labelPrazo, produtoComEstabelecimento } from "../types";
-import { formatarMoeda, isValidCnpj, isValidEmail, maskCnpj, maskTelefone } from "../utils/format";
+import {
+  DescontoPadrao,
+  ProdutoInteresse,
+  nomeDescontoPadrao,
+  produtoComEstabelecimento,
+} from "../types";
+import {
+  formatarMoeda,
+  formatarPercentual,
+  isValidCnpj,
+  isValidEmail,
+  maskCnpj,
+  maskTelefone,
+} from "../utils/format";
 
 type Props = NativeStackScreenProps<AppStackParamList, "NovoCliente">;
 
@@ -46,9 +58,9 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   const [estabelecimentoIds, setEstabelecimentoIds] = useState<string[]>([]);
   const [produtosPorEstab, setProdutosPorEstab] = useState<Record<string, Produto[]>>({});
   const [quantidades, setQuantidades] = useState<Record<string, number>>({});
-  const [prazos, setPrazos] = useState<PrazoContrato[]>([]);
-  const [prazosCarregados, setPrazosCarregados] = useState(false);
-  const [prazosSelecionados, setPrazosSelecionados] = useState<Record<string, string | null>>({});
+  const [descontos, setDescontos] = useState<DescontoPadrao[]>([]);
+  const [descontosCarregados, setDescontosCarregados] = useState(false);
+  const [descontosSelecionados, setDescontosSelecionados] = useState<Record<string, string | null>>({});
   const [observacoes, setObservacoes] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -104,25 +116,38 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   }, [produtosOriginais, prefilAplicado]);
 
   useEffect(() => {
-    return ouvirPrazos((lista) => {
-      setPrazos(lista);
-      setPrazosCarregados(true);
+    return ouvirDescontos((lista) => {
+      setDescontos(lista);
+      setDescontosCarregados(true);
     });
   }, []);
 
-  const [prefilPrazoAplicado, setPrefilPrazoAplicado] = useState(false);
+  // Descobre qual desconto padrão o produto já usava. Registros novos guardam o
+  // id; os antigos só têm prazo (e percentual), então casa por eles.
+  function descontoDoProduto(p: ProdutoInteresse): DescontoPadrao | undefined {
+    const porId = p.descontoId ? descontos.find((d) => d.id === p.descontoId) : undefined;
+    if (porId) return porId;
+    const exato = descontos.find(
+      (d) => (d.meses ?? 0) === (p.prazoMeses ?? 0) && d.descontoPercentual === (p.descontoPercentual ?? 0)
+    );
+    if (exato) return exato;
+    return p.prazoMeses ? descontos.find((d) => d.meses === p.prazoMeses) : undefined;
+  }
+
+  const [prefilDescontoAplicado, setPrefilDescontoAplicado] = useState(false);
   useEffect(() => {
-    if (prefilPrazoAplicado || !produtosOriginais || !prazosCarregados) return;
+    if (prefilDescontoAplicado || !produtosOriginais || !descontosCarregados) return;
     const inicial: Record<string, string | null> = {};
     produtosOriginais.forEach((p) => {
-      if (p.prazoMeses) {
-        const encontrado = prazos.find((pr) => pr.meses === p.prazoMeses);
+      if (p.prazoMeses || p.descontoPercentual) {
+        const encontrado = descontoDoProduto(p);
         inicial[chave(p.estabelecimentoId || "", p.id)] = encontrado ? encontrado.id : null;
       }
     });
-    setPrazosSelecionados(inicial);
-    setPrefilPrazoAplicado(true);
-  }, [produtosOriginais, prazos, prazosCarregados, prefilPrazoAplicado]);
+    setDescontosSelecionados(inicial);
+    setPrefilDescontoAplicado(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produtosOriginais, descontos, descontosCarregados, prefilDescontoAplicado]);
 
   function alternarEstabelecimento(id: string) {
     setEstabelecimentoIds((atual) =>
@@ -130,14 +155,17 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
     );
   }
 
-  function selecionarPrazo(estabelecimentoId: string, produtoId: string, prazoId: string | null) {
-    setPrazosSelecionados((atual) => ({ ...atual, [chave(estabelecimentoId, produtoId)]: prazoId }));
+  function selecionarDesconto(estabelecimentoId: string, produtoId: string, descontoId: string | null) {
+    setDescontosSelecionados((atual) => ({
+      ...atual,
+      [chave(estabelecimentoId, produtoId)]: descontoId,
+    }));
   }
 
-  function valorComDesconto(produto: Produto, prazoId: string | null | undefined) {
-    const prazo = prazoId ? prazos.find((p) => p.id === prazoId) : null;
-    if (!prazo) return produto.valorTabela;
-    return produto.valorTabela * (1 - prazo.descontoPercentual / 100);
+  function valorComDesconto(produto: Produto, descontoId: string | null | undefined) {
+    const desconto = descontoId ? descontos.find((d) => d.id === descontoId) : null;
+    if (!desconto) return produto.valorTabela;
+    return produto.valorTabela * (1 - desconto.descontoPercentual / 100);
   }
 
   function disponivelParaEsteCliente(estabelecimentoId: string, produto: Produto) {
@@ -163,7 +191,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
       totalGeral +
       produtosDoEst.reduce((total, p) => {
         const k = chave(estId, p.id);
-        return total + (quantidades[k] ?? 0) * valorComDesconto(p, prazosSelecionados[k]);
+        return total + (quantidades[k] ?? 0) * valorComDesconto(p, descontosSelecionados[k]);
       }, 0)
     );
   }, 0);
@@ -197,16 +225,23 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
         .filter((p) => (quantidades[chave(estId, p.id)] ?? 0) > 0)
         .map((p) => {
           const k = chave(estId, p.id);
-          const prazoId = prazosSelecionados[k] ?? null;
-          const prazo = prazoId ? prazos.find((pr) => pr.id === prazoId) : null;
+          const descontoId = descontosSelecionados[k] ?? null;
+          const desconto = descontoId ? descontos.find((d) => d.id === descontoId) : null;
           return {
             id: p.id,
             nome: p.nome,
             quantidade: quantidades[k],
-            valorUnitario: valorComDesconto(p, prazoId),
+            valorUnitario: valorComDesconto(p, descontoId),
             estabelecimentoId: estId,
             estabelecimentoNome: nomeEstabelecimento,
-            ...(prazo ? { prazoMeses: prazo.meses, descontoPercentual: prazo.descontoPercentual } : {}),
+            ...(desconto
+              ? {
+                  descontoId: desconto.id,
+                  descontoPercentual: desconto.descontoPercentual,
+                  ...(desconto.descricao ? { descontoDescricao: desconto.descricao } : {}),
+                  ...(desconto.meses ? { prazoMeses: desconto.meses } : {}),
+                }
+              : {}),
           };
         });
     });
@@ -352,8 +387,8 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
                     const k = chave(estId, produto.id);
                     const quantidade = quantidades[k] ?? 0;
                     const esgotado = disponivel <= 0;
-                    const prazoSelecionadoId = prazosSelecionados[k] ?? null;
-                    const valorFinal = valorComDesconto(produto, prazoSelecionadoId);
+                    const descontoSelecionadoId = descontosSelecionados[k] ?? null;
+                    const valorFinal = valorComDesconto(produto, descontoSelecionadoId);
                     return (
                       <View
                         key={produto.id}
@@ -395,33 +430,33 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
                           </View>
                         </View>
 
-                        {quantidade > 0 && prazos.length > 0 && (
+                        {quantidade > 0 && descontos.length > 0 && (
                           <View style={styles.prazoContainer}>
-                            <Text style={styles.prazoLabel}>Prazo do contrato</Text>
+                            <Text style={styles.prazoLabel}>Desconto</Text>
                             <View style={styles.prazoOpcoes}>
                               <Pressable
                                 style={[
                                   styles.prazoOpcao,
-                                  !prazoSelecionadoId && styles.prazoOpcaoSelecionada,
+                                  !descontoSelecionadoId && styles.prazoOpcaoSelecionada,
                                 ]}
-                                onPress={() => selecionarPrazo(estId, produto.id, null)}
+                                onPress={() => selecionarDesconto(estId, produto.id, null)}
                               >
                                 <Text
                                   style={[
                                     styles.prazoOpcaoTexto,
-                                    !prazoSelecionadoId && styles.prazoOpcaoTextoSelecionado,
+                                    !descontoSelecionadoId && styles.prazoOpcaoTextoSelecionado,
                                   ]}
                                 >
-                                  Sem prazo
+                                  Sem desconto
                                 </Text>
                               </Pressable>
-                              {prazos.map((prazo) => {
-                                const ativo = prazoSelecionadoId === prazo.id;
+                              {descontos.map((desconto) => {
+                                const ativo = descontoSelecionadoId === desconto.id;
                                 return (
                                   <Pressable
-                                    key={prazo.id}
+                                    key={desconto.id}
                                     style={[styles.prazoOpcao, ativo && styles.prazoOpcaoSelecionada]}
-                                    onPress={() => selecionarPrazo(estId, produto.id, prazo.id)}
+                                    onPress={() => selecionarDesconto(estId, produto.id, desconto.id)}
                                   >
                                     <Text
                                       style={[
@@ -429,8 +464,10 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
                                         ativo && styles.prazoOpcaoTextoSelecionado,
                                       ]}
                                     >
-                                      {labelPrazo(prazo.meses)}
-                                      {prazo.descontoPercentual > 0 ? ` -${prazo.descontoPercentual}%` : ""}
+                                      {nomeDescontoPadrao(desconto)}
+                                      {desconto.descontoPercentual > 0
+                                        ? ` -${formatarPercentual(desconto.descontoPercentual)}`
+                                        : ""}
                                     </Text>
                                   </Pressable>
                                 );

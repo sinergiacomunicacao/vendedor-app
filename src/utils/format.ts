@@ -79,3 +79,8 @@ export function parseMoeda(value: string): number {
 export function formatarMoeda(valor: number): string {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+
+// "7.5" -> "7,5%". Percentuais de desconto aceitam decimais.
+export function formatarPercentual(valor: number): string {
+  return `${String(valor).replace(".", ",")}%`;
+}
