@@ -26,6 +26,7 @@ import ClienteDetalheScreen from "./src/screens/ClienteDetalheScreen";
 import RelatorioScreen from "./src/screens/RelatorioScreen";
 import PrazosContratoScreen from "./src/screens/PrazosContratoScreen";
 import EmpresasAtendidasScreen from "./src/screens/EmpresasAtendidasScreen";
+import VendedoresScreen from "./src/screens/VendedoresScreen";
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const AppStack = createNativeStackNavigator<AppStackParamList>();
@@ -132,6 +133,17 @@ function Root() {
             options={{
               headerShown: true,
               title: "Empresas atendidas",
+              headerStyle: { backgroundColor: colors.primary },
+              headerTintColor: "#fff",
+              headerTitleStyle: { fontFamily: "Prompt_600SemiBold" },
+            }}
+          />
+          <AppStack.Screen
+            name="Vendedores"
+            component={VendedoresScreen}
+            options={{
+              headerShown: true,
+              title: "Vendedores",
               headerStyle: { backgroundColor: colors.primary },
               headerTintColor: "#fff",
               headerTitleStyle: { fontFamily: "Prompt_600SemiBold" },

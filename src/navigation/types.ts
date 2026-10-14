@@ -12,4 +12,5 @@ export type AppStackParamList = {
   Relatorio: undefined;
   PrazosContrato: undefined;
   EmpresasAtendidas: undefined;
+  Vendedores: undefined;
 };

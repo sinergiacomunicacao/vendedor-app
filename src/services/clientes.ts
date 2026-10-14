@@ -12,7 +12,14 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { Cliente, EmpresaAtendida, Estagio, ProdutoInteresse, produtoComEstabelecimento } from "../types";
+import {
+  Cliente,
+  EmpresaAtendida,
+  Estagio,
+  ProdutoInteresse,
+  descontoNovoOuAlterado,
+  produtoComEstabelecimento,
+} from "../types";
 
 const LIMITE_CLIENTES = 200;
 const LIMITE_RELATORIO = 1000;
@@ -144,6 +151,10 @@ export async function atualizarCliente(
       tx.update(refs[i], { estoque: estoque - ajustes[i].delta });
     });
 
+    // Um desconto novo ou diferente do que o gestor aprovou invalida a
+    // aprovação — o gestor precisa aprovar de novo.
+    const invalidarAprovacao = descontoNovoOuAlterado(produtosOriginais, dados.produtosSelecionados);
+
     tx.update(doc(db, "clientes", clienteId), {
       cnpj: dados.cnpj,
       razaoSocial: dados.razaoSocial,
@@ -152,6 +163,13 @@ export async function atualizarCliente(
       email: dados.email,
       produtosInteresse: dados.produtosSelecionados,
       observacoes: dados.observacoes?.trim() ?? "",
+      ...(invalidarAprovacao
+        ? {
+            descontoAprovadoEm: deleteField(),
+            descontoAprovadoPor: deleteField(),
+            descontoAprovadoPorId: deleteField(),
+          }
+        : {}),
     });
 
     const empresaAntes = empresaSnapAntes.data();
@@ -224,6 +242,50 @@ export async function cancelarCliente(cliente: Cliente, motivo: string) {
       motivoCancelamento: motivo.trim(),
       canceladoEm: Date.now(),
     });
+  });
+}
+
+// Remove a ficha de vez (e o espelho em "Empresas atendidas"). Lê o cliente
+// dentro da transação para decidir sobre o estoque com o dado atual, não o da
+// lista na tela: se ele ainda não estava cancelado, devolve o que tinha
+// reservado; um cliente já cancelado teve o estoque devolvido no cancelamento.
+export async function excluirCliente(clienteId: string) {
+  await runTransaction(db, async (tx) => {
+    const clienteRef = doc(db, "clientes", clienteId);
+    const clienteSnap = await tx.get(clienteRef);
+    if (!clienteSnap.exists()) return;
+    const cliente = { id: clienteSnap.id, ...(clienteSnap.data() as Omit<Cliente, "id">) };
+
+    const produtos = cliente.cancelado
+      ? []
+      : cliente.produtosInteresse
+          .map((item) => produtoComEstabelecimento(item, cliente))
+          .filter((p) => p.quantidade > 0 && p.estabelecimentoId);
+    const refs = produtos.map((p) =>
+      doc(db, "estabelecimentos", p.estabelecimentoId || "", "produtos", p.id)
+    );
+    const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
+
+    snaps.forEach((snap, i) => {
+      if (!snap.exists()) return;
+      const estoque = (snap.data()?.estoque as number) ?? 0;
+      tx.update(refs[i], { estoque: estoque + produtos[i].quantidade });
+    });
+
+    tx.delete(clienteRef);
+    tx.delete(empresaAtendidaRef(clienteId));
+  });
+}
+
+export async function aprovarDescontoCliente(
+  clienteId: string,
+  gestorId: string,
+  gestorNome: string
+) {
+  await updateDoc(doc(db, "clientes", clienteId), {
+    descontoAprovadoEm: Date.now(),
+    descontoAprovadoPor: gestorNome,
+    descontoAprovadoPorId: gestorId,
   });
 }
 

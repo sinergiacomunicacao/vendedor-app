@@ -21,12 +21,23 @@ import {
   estabelecimentosDoCliente,
   labelPrazo,
   normalizarProdutoInteresse,
+  statusDesconto,
   valorTotalCliente,
 } from "../types";
 import { exportarPlanilha } from "../utils/planilha";
 import { formatarMoeda, maskData, parseData } from "../utils/format";
 
 type Props = NativeStackScreenProps<AppStackParamList, "Relatorio">;
+
+function rotuloDesconto(cliente: Cliente) {
+  const status = statusDesconto(cliente);
+  if (status === "nenhum") return "Sem desconto";
+  if (status === "pendente") return "Pendente de aprovação";
+  const data = cliente.descontoAprovadoEm
+    ? ` em ${new Date(cliente.descontoAprovadoEm).toLocaleDateString("pt-BR")}`
+    : "";
+  return `Aprovado por ${cliente.descontoAprovadoPor || "gestor"}${data}`;
+}
 
 const CORES_ESTAGIO: Record<Estagio, string> = {
   contato: colors.accent,
@@ -124,6 +135,7 @@ export default function RelatorioScreen({ navigation }: Props) {
         "Estabelecimento",
         "Produtos de Interesse",
         "Valor Total",
+        "Desconto",
         "Estágio",
         "Data de Fechamento",
         "Observações",
@@ -152,6 +164,7 @@ export default function RelatorioScreen({ navigation }: Props) {
           })
           .join("; "),
         formatarMoeda(valorTotalCliente(cliente.produtosInteresse)),
+        rotuloDesconto(cliente),
         labelEstagio(cliente.estagio ?? "contato"),
         cliente.dataFechamento ? new Date(cliente.dataFechamento).toLocaleDateString("pt-BR") : "",
         cliente.observacoes ?? "",

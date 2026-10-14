@@ -73,6 +73,13 @@ export type Cliente = {
   motivoCancelamento?: string;
   canceladoEm?: number;
   dataFechamento?: number;
+  // Aprovação de desconto pelo gestor. Ausente = nenhum desconto aprovado
+  // (pendente, se o cliente tiver algum produto com desconto). Só o gestor
+  // consegue gravar esses campos (firestore.rules); o vendedor só consegue
+  // removê-los, o que acontece quando ele muda prazo/desconto de um produto.
+  descontoAprovadoEm?: number;
+  descontoAprovadoPor?: string;
+  descontoAprovadoPorId?: string;
   criadoEm: number;
 };
 
@@ -175,4 +182,36 @@ export function diasParaVencimento(cliente: Cliente): number | null {
 // compartilhando a mesma data de fechamento.
 export function diasParaVencimentoProduto(cliente: Cliente, produto: ProdutoInteresse): number | null {
   return diasParaVencimentoDoPrazo(cliente.dataFechamento, produto.prazoMeses ?? 0);
+}
+
+export type StatusDesconto = "nenhum" | "pendente" | "aprovado";
+
+// Cliente cancelado não conta: o desconto dele já não vale para ninguém.
+export function clienteTemDesconto(cliente: Cliente): boolean {
+  if (cliente.cancelado) return false;
+  return cliente.produtosInteresse
+    .map(normalizarProdutoInteresse)
+    .some((p) => (p.descontoPercentual ?? 0) > 0);
+}
+
+export function statusDesconto(cliente: Cliente): StatusDesconto {
+  if (!clienteTemDesconto(cliente)) return "nenhum";
+  return cliente.descontoAprovadoEm ? "aprovado" : "pendente";
+}
+
+// Verdadeiro quando `novos` traz algum desconto que não estava aprovado em
+// `originais` (produto/prazo/percentual novos ou diferentes). Mudar só a
+// quantidade, ou remover linhas, não invalida a aprovação.
+export function descontoNovoOuAlterado(
+  originais: ProdutoInteresse[],
+  novos: ProdutoInteresse[]
+): boolean {
+  const chave = (p: ProdutoInteresse) =>
+    `${p.estabelecimentoId || ""}::${p.id}|${p.prazoMeses ?? 0}|${p.descontoPercentual ?? 0}`;
+  const aprovados = new Set(
+    originais.filter((p) => (p.descontoPercentual ?? 0) > 0).map(chave)
+  );
+  return novos
+    .filter((p) => (p.descontoPercentual ?? 0) > 0)
+    .some((p) => !aprovados.has(chave(p)));
 }

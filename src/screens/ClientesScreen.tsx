@@ -4,7 +4,7 @@ import { FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
 import { AppStackParamList } from "../navigation/types";
-import { ouvirClientesDoVendedor, ouvirTodosClientes } from "../services/clientes";
+import { excluirCliente, ouvirClientesDoVendedor, ouvirTodosClientes } from "../services/clientes";
 import { ouvirVendedores, Vendedor } from "../services/vendedores";
 import { colors } from "../theme/colors";
 import {
@@ -14,8 +14,10 @@ import {
   diasParaVencimento,
   estabelecimentosDoCliente,
   normalizarProdutoInteresse,
+  statusDesconto,
   valorTotalCliente,
 } from "../types";
+import { showAlert } from "../utils/alert";
 import { formatarMoeda } from "../utils/format";
 
 const CORES_ESTAGIO: Record<Estagio, string> = {
@@ -29,6 +31,29 @@ function labelEstagio(estagio: Estagio) {
   return ESTAGIOS.find((e) => e.id === estagio)?.label ?? estagio;
 }
 
+function confirmarExclusao(cliente: Cliente) {
+  showAlert(
+    "Excluir cliente",
+    `Excluir "${cliente.razaoSocial}" definitivamente? A ficha sai do sistema e da lista "Empresas atendidas"${
+      cliente.cancelado ? "" : ", e o que ele reservou volta ao estoque"
+    }. Não dá para desfazer.`,
+    [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await excluirCliente(cliente.id);
+          } catch {
+            showAlert("Erro", "Não foi possível excluir o cliente. Tente novamente.");
+          }
+        },
+      },
+    ]
+  );
+}
+
 type Props = NativeStackScreenProps<AppStackParamList, "Clientes">;
 
 export default function ClientesScreen({ navigation }: Props) {
@@ -39,7 +64,9 @@ export default function ClientesScreen({ navigation }: Props) {
   const [busca, setBusca] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
 
-  function irPara(tela: "Relatorio" | "Estabelecimentos" | "PrazosContrato" | "EmpresasAtendidas") {
+  function irPara(
+    tela: "Relatorio" | "Vendedores" | "Estabelecimentos" | "PrazosContrato" | "EmpresasAtendidas"
+  ) {
     setMenuAberto(false);
     navigation.navigate(tela);
   }
@@ -77,6 +104,8 @@ export default function ClientesScreen({ navigation }: Props) {
         ...estabelecimentosDoCliente(cliente).map((e) => e.nome),
         cliente.observacoes ?? "",
         gestor ? nomeVendedor(cliente.vendedorId) : "",
+        cliente.cancelado ? "cancelado" : "",
+        statusDesconto(cliente) === "pendente" ? "desconto pendente aprovação" : "",
       ]
         .join(" ")
         .toLowerCase()
@@ -103,12 +132,22 @@ export default function ClientesScreen({ navigation }: Props) {
         >
           <View style={styles.cardTopo}>
             <Text style={styles.razaoSocial}>{item.razaoSocial}</Text>
-            <View style={[styles.tagEstagio, { backgroundColor: CORES_ESTAGIO[estagio] }]}>
-              <Text style={styles.tagEstagioTexto}>{labelEstagio(estagio)}</Text>
+            <View
+              style={[
+                styles.tagEstagio,
+                { backgroundColor: item.cancelado ? colors.danger : CORES_ESTAGIO[estagio] },
+              ]}
+            >
+              <Text style={styles.tagEstagioTexto}>
+                {item.cancelado ? "Cancelado" : labelEstagio(estagio)}
+              </Text>
             </View>
           </View>
           {gestor && <Text style={styles.detalheVendedor}>Vendedor: {nomeVendedor(item.vendedorId)}</Text>}
           {alertaVencimento && <Text style={styles.alertaVencimento}>{alertaVencimento}</Text>}
+          {statusDesconto(item) === "pendente" && (
+            <Text style={styles.alertaDesconto}>Desconto aguardando aprovação do gestor</Text>
+          )}
           <Text style={styles.detalhe}>CNPJ: {item.cnpj}</Text>
           {item.responsavel ? (
             <Text style={styles.detalhe}>Responsável: {item.responsavel}</Text>
@@ -131,6 +170,15 @@ export default function ClientesScreen({ navigation }: Props) {
               </View>
             ))}
           </View>
+          {gestor && (
+            <Pressable
+              style={styles.botaoExcluir}
+              onPress={() => confirmarExclusao(item)}
+              hitSlop={6}
+            >
+              <Text style={styles.botaoExcluirTexto}>Excluir</Text>
+            </Pressable>
+          )}
         </Pressable>
       );
     },
@@ -179,6 +227,9 @@ export default function ClientesScreen({ navigation }: Props) {
               <>
                 <Pressable style={styles.menuItem} onPress={() => irPara("Relatorio")}>
                   <Text style={styles.menuItemTexto}>Relatório</Text>
+                </Pressable>
+                <Pressable style={styles.menuItem} onPress={() => irPara("Vendedores")}>
+                  <Text style={styles.menuItemTexto}>Vendedores</Text>
                 </Pressable>
                 <Pressable style={styles.menuItem} onPress={() => irPara("Estabelecimentos")}>
                   <Text style={styles.menuItemTexto}>Estabelecimentos</Text>
@@ -319,6 +370,19 @@ const styles = StyleSheet.create({
     fontFamily: "Prompt_600SemiBold",
     color: colors.danger,
     marginBottom: 6,
+  },
+  alertaDesconto: {
+    fontSize: 13,
+    fontFamily: "Prompt_600SemiBold",
+    color: colors.warning,
+    marginBottom: 6,
+  },
+  botaoExcluir: { alignSelf: "flex-end", marginTop: 10 },
+  botaoExcluirTexto: {
+    fontSize: 12,
+    fontFamily: "Prompt_600SemiBold",
+    color: colors.danger,
+    textDecorationLine: "underline",
   },
   detalhe: { fontSize: 14, fontFamily: "Prompt_400Regular", color: colors.text, marginBottom: 2 },
   detalheVendedor: {

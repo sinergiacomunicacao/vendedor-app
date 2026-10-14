@@ -11,9 +11,11 @@ import {
   View,
 } from "react-native";
 import { doc, onSnapshot } from "firebase/firestore";
+import { useAuth } from "../contexts/AuthContext";
 import { AppStackParamList } from "../navigation/types";
 import { db } from "../services/firebase";
 import {
+  aprovarDescontoCliente,
   atualizarDataFechamentoCliente,
   atualizarEstagioCliente,
   atualizarObservacoesCliente,
@@ -30,6 +32,7 @@ import {
   estabelecimentosDoCliente,
   labelPrazo,
   produtosPorEstabelecimento,
+  statusDesconto,
   valorTotalCliente,
 } from "../types";
 import { showAlert } from "../utils/alert";
@@ -46,6 +49,8 @@ type Props = NativeStackScreenProps<AppStackParamList, "ClienteDetalhe">;
 
 export default function ClienteDetalheScreen({ navigation, route }: Props) {
   const { clienteId } = route.params;
+  const { user, gestor } = useAuth();
+  const [aprovandoDesconto, setAprovandoDesconto] = useState(false);
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [excluindo, setExcluindo] = useState(false);
@@ -115,6 +120,30 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
     } finally {
       setMudandoEstagio(false);
     }
+  }
+
+  function handleAprovarDesconto() {
+    if (!cliente || !user) return;
+    showAlert(
+      "Aprovar desconto",
+      `Aprovar os descontos concedidos a "${cliente.razaoSocial}"? Se o vendedor mudar o prazo ou o desconto depois, será preciso aprovar de novo.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Aprovar",
+          onPress: async () => {
+            setAprovandoDesconto(true);
+            try {
+              await aprovarDescontoCliente(cliente.id, user.uid, user.displayName ?? "Gestor");
+            } catch {
+              showAlert("Erro", "Não foi possível aprovar o desconto. Tente novamente.");
+            } finally {
+              setAprovandoDesconto(false);
+            }
+          },
+        },
+      ]
+    );
   }
 
   function handleLiberarProduto(produto: ProdutoInteresse) {
@@ -340,6 +369,35 @@ export default function ClienteDetalheScreen({ navigation, route }: Props) {
         </Text>
       </View>
 
+      {statusDesconto(cliente) === "aprovado" && (
+        <View style={[styles.blocoDesconto, styles.blocoDescontoAprovado]}>
+          <Text style={styles.descontoAprovadoTexto}>
+            Desconto aprovado por {cliente.descontoAprovadoPor || "gestor"}
+            {cliente.descontoAprovadoEm
+              ? ` em ${new Date(cliente.descontoAprovadoEm).toLocaleDateString("pt-BR")}`
+              : ""}
+          </Text>
+        </View>
+      )}
+      {statusDesconto(cliente) === "pendente" && (
+        <View style={[styles.blocoDesconto, styles.blocoDescontoPendente]}>
+          <Text style={styles.descontoPendenteTexto}>Desconto aguardando aprovação do gestor</Text>
+          {gestor && (
+            <Pressable
+              style={styles.botaoAprovarDesconto}
+              onPress={handleAprovarDesconto}
+              disabled={aprovandoDesconto}
+            >
+              {aprovandoDesconto ? (
+                <ActivityIndicator color={colors.surface} />
+              ) : (
+                <Text style={styles.botaoAprovarDescontoTexto}>Aprovar desconto</Text>
+              )}
+            </Pressable>
+          )}
+        </View>
+      )}
+
       <Text style={styles.rotulo}>Observações</Text>
       <TextInput
         style={styles.inputObservacoes}
@@ -535,6 +593,42 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontFamily: "Prompt_600SemiBold", color: colors.textMuted, fontSize: 14 },
   totalValor: { fontFamily: "Prompt_700Bold", color: colors.primary, fontSize: 18 },
+  blocoDesconto: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 12,
+  },
+  blocoDescontoAprovado: {
+    borderColor: colors.success,
+    backgroundColor: colors.success + "15",
+  },
+  blocoDescontoPendente: {
+    borderColor: colors.warning,
+    backgroundColor: colors.warning + "15",
+  },
+  descontoAprovadoTexto: {
+    color: colors.success,
+    fontSize: 13,
+    fontFamily: "Prompt_600SemiBold",
+  },
+  descontoPendenteTexto: {
+    color: colors.text,
+    fontSize: 13,
+    fontFamily: "Prompt_600SemiBold",
+  },
+  botaoAprovarDesconto: {
+    backgroundColor: colors.success,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  botaoAprovarDescontoTexto: {
+    color: colors.surface,
+    fontSize: 14,
+    fontFamily: "Prompt_600SemiBold",
+  },
   inputObservacoes: {
     borderWidth: 1,
     borderColor: colors.border,
