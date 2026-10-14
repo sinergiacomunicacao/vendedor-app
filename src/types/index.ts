@@ -132,7 +132,7 @@ export function nomeDescontoPadrao(d: Pick<DescontoPadrao, "descricao" | "meses"
 export function resumoDescontoProduto(p: ProdutoInteresse): string {
   const partes: string[] = [];
   if (p.descontoDescricao) partes.push(p.descontoDescricao);
-  if (p.prazoMeses) partes.push(labelPrazo(p.prazoMeses));
+  if (p.prazoMeses) partes.push(`Contrato: ${labelPrazo(p.prazoMeses)}`);
   if (p.descontoPercentual) partes.push(`${formatarPercentual(p.descontoPercentual)} de desconto`);
   return partes.join(" · ");
 }

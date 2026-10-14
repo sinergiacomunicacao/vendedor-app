@@ -13,6 +13,7 @@ import {
   Estagio,
   diasParaVencimento,
   estabelecimentosDoCliente,
+  labelPrazo,
   normalizarProdutoInteresse,
   statusDesconto,
   valorTotalCliente,
@@ -166,6 +167,7 @@ export default function ClientesScreen({ navigation }: Props) {
                 <Text style={styles.tagTexto}>
                   {produto.nome}
                   {produto.quantidade > 1 ? ` ×${produto.quantidade}` : ""}
+                  {produto.prazoMeses ? ` · ${labelPrazo(produto.prazoMeses)}` : ""}
                 </Text>
               </View>
             ))}

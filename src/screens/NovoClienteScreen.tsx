@@ -61,6 +61,9 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   const [descontos, setDescontos] = useState<DescontoPadrao[]>([]);
   const [descontosCarregados, setDescontosCarregados] = useState(false);
   const [descontosSelecionados, setDescontosSelecionados] = useState<Record<string, string | null>>({});
+  // Tempo de contrato por produto (meses, como texto digitado). Independe do
+  // desconto: o desconto escolhido só preenche o campo como sugestão.
+  const [mesesContrato, setMesesContrato] = useState<Record<string, string>>({});
   const [observacoes, setObservacoes] = useState("");
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -108,10 +111,14 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
     );
     setEstabelecimentoIds(idsIniciais);
     const qtds: Record<string, number> = {};
+    const meses: Record<string, string> = {};
     produtosOriginais.forEach((p) => {
-      qtds[chave(p.estabelecimentoId || "", p.id)] = p.quantidade;
+      const k = chave(p.estabelecimentoId || "", p.id);
+      qtds[k] = p.quantidade;
+      if (p.prazoMeses) meses[k] = String(p.prazoMeses);
     });
     setQuantidades(qtds);
+    setMesesContrato(meses);
     setPrefilAplicado(true);
   }, [produtosOriginais, prefilAplicado]);
 
@@ -123,12 +130,14 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   }, []);
 
   // Descobre qual desconto padrão o produto já usava. Registros novos guardam o
-  // id; os antigos só têm prazo (e percentual), então casa por eles.
+  // id; os antigos só têm prazo e percentual, então casa por eles. Só procura
+  // quando o produto tem desconto: o prazo sozinho não escolhe desconto algum.
   function descontoDoProduto(p: ProdutoInteresse): DescontoPadrao | undefined {
     const porId = p.descontoId ? descontos.find((d) => d.id === p.descontoId) : undefined;
     if (porId) return porId;
+    if (!p.descontoPercentual) return undefined;
     const exato = descontos.find(
-      (d) => (d.meses ?? 0) === (p.prazoMeses ?? 0) && d.descontoPercentual === (p.descontoPercentual ?? 0)
+      (d) => (d.meses ?? 0) === (p.prazoMeses ?? 0) && d.descontoPercentual === p.descontoPercentual
     );
     if (exato) return exato;
     return p.prazoMeses ? descontos.find((d) => d.meses === p.prazoMeses) : undefined;
@@ -139,7 +148,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
     if (prefilDescontoAplicado || !produtosOriginais || !descontosCarregados) return;
     const inicial: Record<string, string | null> = {};
     produtosOriginais.forEach((p) => {
-      if (p.prazoMeses || p.descontoPercentual) {
+      if (p.descontoId || p.descontoPercentual) {
         const encontrado = descontoDoProduto(p);
         inicial[chave(p.estabelecimentoId || "", p.id)] = encontrado ? encontrado.id : null;
       }
@@ -156,10 +165,15 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
   }
 
   function selecionarDesconto(estabelecimentoId: string, produtoId: string, descontoId: string | null) {
-    setDescontosSelecionados((atual) => ({
-      ...atual,
-      [chave(estabelecimentoId, produtoId)]: descontoId,
-    }));
+    const k = chave(estabelecimentoId, produtoId);
+    setDescontosSelecionados((atual) => ({ ...atual, [k]: descontoId }));
+    // Desconto com prazo sugere o tempo de contrato; o vendedor pode ajustar.
+    const meses = descontoId ? descontos.find((d) => d.id === descontoId)?.meses : undefined;
+    if (meses) setMesesContrato((atual) => ({ ...atual, [k]: String(meses) }));
+  }
+
+  function alterarMeses(k: string, texto: string) {
+    setMesesContrato((atual) => ({ ...atual, [k]: texto.replace(/\D/g, "") }));
   }
 
   function valorComDesconto(produto: Produto, descontoId: string | null | undefined) {
@@ -227,6 +241,7 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
           const k = chave(estId, p.id);
           const descontoId = descontosSelecionados[k] ?? null;
           const desconto = descontoId ? descontos.find((d) => d.id === descontoId) : null;
+          const meses = Math.floor(Number(mesesContrato[k]));
           return {
             id: p.id,
             nome: p.nome,
@@ -234,12 +249,12 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
             valorUnitario: valorComDesconto(p, descontoId),
             estabelecimentoId: estId,
             estabelecimentoNome: nomeEstabelecimento,
+            ...(meses > 0 ? { prazoMeses: meses } : {}),
             ...(desconto
               ? {
                   descontoId: desconto.id,
                   descontoPercentual: desconto.descontoPercentual,
                   ...(desconto.descricao ? { descontoDescricao: desconto.descricao } : {}),
-                  ...(desconto.meses ? { prazoMeses: desconto.meses } : {}),
                 }
               : {}),
           };
@@ -430,53 +445,67 @@ export default function NovoClienteScreen({ navigation, route }: Props) {
                           </View>
                         </View>
 
-                        {quantidade > 0 && descontos.length > 0 && (
+                        {quantidade > 0 && (
                           <View style={styles.prazoContainer}>
-                            <Text style={styles.prazoLabel}>Desconto</Text>
-                            <View style={styles.prazoOpcoes}>
-                              <Pressable
-                                style={[
-                                  styles.prazoOpcao,
-                                  !descontoSelecionadoId && styles.prazoOpcaoSelecionada,
-                                ]}
-                                onPress={() => selecionarDesconto(estId, produto.id, null)}
-                              >
-                                <Text
-                                  style={[
-                                    styles.prazoOpcaoTexto,
-                                    !descontoSelecionadoId && styles.prazoOpcaoTextoSelecionado,
-                                  ]}
-                                >
-                                  Sem desconto
-                                </Text>
-                              </Pressable>
-                              {descontos.map((desconto) => {
-                                const ativo = descontoSelecionadoId === desconto.id;
-                                return (
+                            <Text style={styles.prazoLabel}>Tempo de contrato (meses)</Text>
+                            <TextInput
+                              style={styles.mesesInput}
+                              placeholder="Ex.: 12"
+                              keyboardType="number-pad"
+                              maxLength={3}
+                              value={mesesContrato[k] ?? ""}
+                              onChangeText={(texto) => alterarMeses(k, texto)}
+                            />
+                            {descontos.length > 0 && (
+                              <View style={styles.descontoBloco}>
+                                <Text style={styles.prazoLabel}>Desconto</Text>
+                                <View style={styles.prazoOpcoes}>
                                   <Pressable
-                                    key={desconto.id}
-                                    style={[styles.prazoOpcao, ativo && styles.prazoOpcaoSelecionada]}
-                                    onPress={() => selecionarDesconto(estId, produto.id, desconto.id)}
+                                    style={[
+                                      styles.prazoOpcao,
+                                      !descontoSelecionadoId && styles.prazoOpcaoSelecionada,
+                                    ]}
+                                    onPress={() => selecionarDesconto(estId, produto.id, null)}
                                   >
                                     <Text
                                       style={[
                                         styles.prazoOpcaoTexto,
-                                        ativo && styles.prazoOpcaoTextoSelecionado,
+                                        !descontoSelecionadoId && styles.prazoOpcaoTextoSelecionado,
                                       ]}
                                     >
-                                      {nomeDescontoPadrao(desconto)}
-                                      {desconto.descontoPercentual > 0
-                                        ? ` -${formatarPercentual(desconto.descontoPercentual)}`
-                                        : ""}
+                                      Sem desconto
                                     </Text>
                                   </Pressable>
-                                );
-                              })}
-                            </View>
-                            {valorFinal !== produto.valorTabela && (
-                              <Text style={styles.prazoValorComDesconto}>
-                                {formatarMoeda(valorFinal)} com desconto (de {formatarMoeda(produto.valorTabela)})
-                              </Text>
+                                  {descontos.map((desconto) => {
+                                    const ativo = descontoSelecionadoId === desconto.id;
+                                    return (
+                                      <Pressable
+                                        key={desconto.id}
+                                        style={[styles.prazoOpcao, ativo && styles.prazoOpcaoSelecionada]}
+                                        onPress={() => selecionarDesconto(estId, produto.id, desconto.id)}
+                                      >
+                                        <Text
+                                          style={[
+                                            styles.prazoOpcaoTexto,
+                                            ativo && styles.prazoOpcaoTextoSelecionado,
+                                          ]}
+                                        >
+                                          {nomeDescontoPadrao(desconto)}
+                                          {desconto.descontoPercentual > 0
+                                            ? ` -${formatarPercentual(desconto.descontoPercentual)}`
+                                            : ""}
+                                        </Text>
+                                      </Pressable>
+                                    );
+                                  })}
+                                </View>
+                                {valorFinal !== produto.valorTabela && (
+                                  <Text style={styles.prazoValorComDesconto}>
+                                    {formatarMoeda(valorFinal)} com desconto (de{" "}
+                                    {formatarMoeda(produto.valorTabela)})
+                                  </Text>
+                                )}
+                              </View>
                             )}
                           </View>
                         )}
@@ -609,6 +638,18 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: 6,
   },
+  mesesInput: {
+    width: 110,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    fontSize: 14,
+    fontFamily: "Prompt_400Regular",
+    color: colors.text,
+  },
+  descontoBloco: { marginTop: 12 },
   prazoOpcoes: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   prazoOpcao: {
     borderWidth: 1,
