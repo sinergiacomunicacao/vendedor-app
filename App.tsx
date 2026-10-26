@@ -26,6 +26,7 @@ import ClienteDetalheScreen from "./src/screens/ClienteDetalheScreen";
 import RelatorioScreen from "./src/screens/RelatorioScreen";
 import ComissoesScreen from "./src/screens/ComissoesScreen";
 import DescontosPadraoScreen from "./src/screens/DescontosPadraoScreen";
+import MinhasComissoesScreen from "./src/screens/MinhasComissoesScreen";
 import EmpresasAtendidasScreen from "./src/screens/EmpresasAtendidasScreen";
 import VendedoresScreen from "./src/screens/VendedoresScreen";
 
@@ -123,6 +124,17 @@ function Root() {
             options={{
               headerShown: true,
               title: "Comissões",
+              headerStyle: { backgroundColor: colors.primary },
+              headerTintColor: "#fff",
+              headerTitleStyle: { fontFamily: "Prompt_600SemiBold" },
+            }}
+          />
+          <AppStack.Screen
+            name="MinhasComissoes"
+            component={MinhasComissoesScreen}
+            options={{
+              headerShown: true,
+              title: "Minhas comissões",
               headerStyle: { backgroundColor: colors.primary },
               headerTintColor: "#fff",
               headerTitleStyle: { fontFamily: "Prompt_600SemiBold" },

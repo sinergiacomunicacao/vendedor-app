@@ -76,6 +76,15 @@ service cloud.firestore {
       allow read, write: if isGestor();
     }
 
+    // Visão da comissão de cada pessoa. O app do gestor grava uma linha por
+    // contrato e beneficiário; cada vendedor só lê as linhas dele (a consulta
+    // precisa filtrar por vendedorId).
+    match /comissoesVendedor/{linhaId} {
+      allow read: if contaAtiva()
+        && (resource.data.vendedorId == request.auth.uid || isGestor());
+      allow write: if isGestor();
+    }
+
     match /prazosContrato/{prazoId} {
       allow read: if request.auth != null;
       allow write: if isGestor();

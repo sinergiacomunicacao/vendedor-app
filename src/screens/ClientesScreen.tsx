@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../contexts/AuthContext";
+import { useSincronizarComissoes } from "../hooks/useDadosComissao";
 import { AppStackParamList } from "../navigation/types";
 import { excluirCliente, ouvirClientesDoVendedor, ouvirTodosClientes } from "../services/clientes";
 import { ouvirVendedores, Vendedor } from "../services/vendedores";
@@ -65,10 +66,15 @@ export default function ClientesScreen({ navigation }: Props) {
   const [busca, setBusca] = useState("");
   const [menuAberto, setMenuAberto] = useState(false);
 
+  // Enquanto um gestor está com o app aberto, mantém em dia o que cada
+  // vendedor vê em "Minhas comissões".
+  useSincronizarComissoes(gestor);
+
   function irPara(
     tela:
       | "Relatorio"
       | "Comissoes"
+      | "MinhasComissoes"
       | "Vendedores"
       | "Estabelecimentos"
       | "DescontosPadrao"
@@ -249,6 +255,11 @@ export default function ClientesScreen({ navigation }: Props) {
                   <Text style={styles.menuItemTexto}>Descontos padrão</Text>
                 </Pressable>
               </>
+            )}
+            {!gestor && (
+              <Pressable style={styles.menuItem} onPress={() => irPara("MinhasComissoes")}>
+                <Text style={styles.menuItemTexto}>Minhas comissões</Text>
+              </Pressable>
             )}
             <Pressable
               style={[styles.menuItem, styles.menuItemUltimo]}

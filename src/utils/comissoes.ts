@@ -1,17 +1,14 @@
 import {
   PagamentoComissao,
   PapelComissao,
+  ProjecaoLinha,
   RegistroComissao,
   RegrasComissao,
+  SituacaoContrato,
 } from "../services/comissoes";
 import { Cliente, produtosPorEstabelecimento, valorTotalCliente } from "../types";
 
-// Situação do contrato em relação à comissão:
-// - "ativo": contrato fechado e não cancelado (comissão devida);
-// - "cancelado" / "reaberto": já teve comissão paga, mas a ficha foi cancelada ou
-//   saiu de "Contrato fechado" depois — fica visível para o gestor decidir;
-// - "excluido": já teve comissão paga, mas a ficha foi apagada.
-export type SituacaoContrato = "ativo" | "cancelado" | "reaberto" | "excluido";
+export type { SituacaoContrato };
 
 // Uma comissão de um contrato para um beneficiário.
 export type LinhaComissao = {
@@ -254,6 +251,35 @@ function ordenarLinhas(linhas: LinhaComissao[]) {
     (a, b) =>
       ORDEM_PAPEL[a.papel] - ORDEM_PAPEL[b.papel] || a.beneficiarioNome.localeCompare(b.beneficiarioNome, "pt-BR")
   );
+}
+
+// As linhas que cada pessoa (usuário do app) pode ver: só as comissões em que
+// ela é a beneficiária — quem fechou a venda ou quem recebe em todos os
+// contratos. Estabelecimentos e agência não são usuários, não entram aqui.
+// A chave do resultado é o id do documento: "<clienteId>_<chave>".
+export function projetarLinhasDosVendedores(contratos: ContratoComissao[]): Record<string, ProjecaoLinha> {
+  const projecao: Record<string, ProjecaoLinha> = {};
+  for (const contrato of contratos) {
+    for (const linha of contrato.linhas) {
+      if (!linha.beneficiarioChave.startsWith("p_")) continue;
+      projecao[`${linha.clienteId}_${linha.chave}`] = {
+        vendedorId: linha.beneficiarioChave.slice(2),
+        clienteId: linha.clienteId,
+        chave: linha.chave,
+        razaoSocial: contrato.razaoSocial,
+        vendedorNome: contrato.vendedorNome,
+        papel: linha.papel,
+        base: linha.base,
+        percentual: linha.percentual,
+        valor: linha.valor,
+        paga: Boolean(linha.pagamento),
+        pagaEm: linha.pagamento?.em ?? null,
+        dataFechamento: contrato.dataFechamento,
+        situacao: contrato.situacao,
+      };
+    }
+  }
+  return projecao;
 }
 
 export type ResumoBeneficiario = {

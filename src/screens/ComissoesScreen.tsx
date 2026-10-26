@@ -12,27 +12,19 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
+import { useDadosComissao } from "../hooks/useDadosComissao";
 import {
   definirAgencia,
   definirPercentualDaComissao,
   desfazerPagamentoComissao,
   marcarComissaoPaga,
-  ouvirComissoes,
-  ouvirRegras,
-  REGRAS_PADRAO,
-  RegistroComissao,
   RegrasComissao,
   salvarRegras,
 } from "../services/comissoes";
-import { ouvirTodosClientes } from "../services/clientes";
-import { Estabelecimento, ouvirEstabelecimentos } from "../services/estabelecimentos";
-import { ouvirVendedores, Vendedor } from "../services/vendedores";
 import { colors } from "../theme/colors";
-import { Cliente } from "../types";
 import {
   ContratoComissao,
   LinhaComissao,
-  montarContratosComissao,
   resumirPorBeneficiario,
   ResumoBeneficiario,
   ROTULO_PAPEL,
@@ -94,13 +86,9 @@ function paraFormulario(regras: RegrasComissao): FormularioRegras {
 
 export default function ComissoesScreen() {
   const { user } = useAuth();
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
-  const [estabelecimentos, setEstabelecimentos] = useState<Estabelecimento[]>([]);
-  const [registros, setRegistros] = useState<Record<string, RegistroComissao>>({});
-  const [regras, setRegras] = useState<RegrasComissao>(REGRAS_PADRAO);
-  const [regrasCarregadas, setRegrasCarregadas] = useState(false);
-  const [carregando, setCarregando] = useState(true);
+  const { vendedores, estabelecimentos, regras, regrasCarregadas, clientesCarregados, contratos } =
+    useDadosComissao(true);
+  const carregando = !clientesCarregados;
 
   const [aba, setAba] = useState<Aba>("resumo");
   const [beneficiarioFiltro, setBeneficiarioFiltro] = useState<string | null>(null);
@@ -116,41 +104,10 @@ export default function ComissoesScreen() {
   const [mensagemRegras, setMensagemRegras] = useState("");
   const [salvandoRegras, setSalvandoRegras] = useState(false);
 
-  useEffect(() => {
-    return ouvirTodosClientes((lista) => {
-      setClientes(lista);
-      setCarregando(false);
-    });
-  }, []);
-  useEffect(() => ouvirVendedores(setVendedores), []);
-  useEffect(() => ouvirEstabelecimentos(setEstabelecimentos), []);
-  useEffect(() => ouvirComissoes(setRegistros), []);
-  useEffect(() => {
-    return ouvirRegras((r) => {
-      setRegras(r);
-      setRegrasCarregadas(true);
-    });
-  }, []);
-
   // O formulário de regras parte do que está salvo, uma vez só.
   useEffect(() => {
     if (regrasCarregadas && form === null) setForm(paraFormulario(regras));
   }, [regrasCarregadas, form, regras]);
-
-  const nomeVendedor = useMemo(() => {
-    const mapa = new Map(vendedores.map((v) => [v.id, v.nome]));
-    return (id: string) => mapa.get(id) ?? "Vendedor removido";
-  }, [vendedores]);
-
-  const nomeEstabelecimento = useMemo(() => {
-    const mapa = new Map(estabelecimentos.map((e) => [e.id, e.nome]));
-    return (id: string, nomeNaFicha: string) => mapa.get(id) ?? (nomeNaFicha || "Estabelecimento");
-  }, [estabelecimentos]);
-
-  const contratos = useMemo(
-    () => montarContratosComissao(clientes, registros, regras, nomeVendedor, nomeEstabelecimento),
-    [clientes, registros, regras, nomeVendedor, nomeEstabelecimento]
-  );
 
   const todasLinhas = useMemo(() => contratos.flatMap((c) => c.linhas), [contratos]);
   const resumo = useMemo(() => resumirPorBeneficiario(todasLinhas), [todasLinhas]);
