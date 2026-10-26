@@ -66,6 +66,16 @@ service cloud.firestore {
                 && request.resource.data.papel in ["vendedor", "gestor"]));
     }
 
+    // Comissões: só o gestor lê e escreve. Ficam fora de `clientes` e de
+    // `vendedores` porque o vendedor lê os próprios clientes e edita o próprio
+    // perfil — qualquer campo de comissão ali ficaria visível/editável por ele.
+    match /comissoes/{clienteId} {
+      allow read, write: if isGestor();
+    }
+    match /comissoesConfig/{vendedorId} {
+      allow read, write: if isGestor();
+    }
+
     match /prazosContrato/{prazoId} {
       allow read: if request.auth != null;
       allow write: if isGestor();

@@ -66,7 +66,13 @@ export default function ClientesScreen({ navigation }: Props) {
   const [menuAberto, setMenuAberto] = useState(false);
 
   function irPara(
-    tela: "Relatorio" | "Vendedores" | "Estabelecimentos" | "DescontosPadrao" | "EmpresasAtendidas"
+    tela:
+      | "Relatorio"
+      | "Comissoes"
+      | "Vendedores"
+      | "Estabelecimentos"
+      | "DescontosPadrao"
+      | "EmpresasAtendidas"
   ) {
     setMenuAberto(false);
     navigation.navigate(tela);
@@ -229,6 +235,9 @@ export default function ClientesScreen({ navigation }: Props) {
               <>
                 <Pressable style={styles.menuItem} onPress={() => irPara("Relatorio")}>
                   <Text style={styles.menuItemTexto}>Relatório</Text>
+                </Pressable>
+                <Pressable style={styles.menuItem} onPress={() => irPara("Comissoes")}>
+                  <Text style={styles.menuItemTexto}>Comissões</Text>
                 </Pressable>
                 <Pressable style={styles.menuItem} onPress={() => irPara("Vendedores")}>
                   <Text style={styles.menuItemTexto}>Vendedores</Text>
